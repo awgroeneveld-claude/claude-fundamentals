@@ -1,0 +1,16 @@
+{
+  "symbol": "VOLCAR B",
+  "exchange": "Nasdaq Stockholm",
+  "company_name": "Volvo Car AB (publ)",
+  "reporting_currency": "SEK",
+  "base_currency": "EUR",
+  "period": { "start": "2018-01-01", "end": "2025-12-31" },
+  "frequency": "both",
+  "recent_quarters": 8,
+  "categories": ["valuation", "profitability", "non_operating", "leverage", "cash_flow_quality", "growth", "ownership", "context"],
+  "peer_symbols": ["BMW", "MBG", "VOW3", "STLAM"],
+  "sector_hint": "premium automotive OEM in EV transition, majority-owned by a strategic shareholder",
+  "allow_web_research": true,
+  "signal_history": true,
+  "notes": "Volvo Car AB listed on Nasdaq Stockholm in October 2021 (B shares, one vote each; A shares, ten votes, are unlisted and held by Geely). Pre-IPO years exist in the IPO prospectus and annual reports: use them for the series, but mark valuation as not assessed for dates before the listing. Reporting currency SEK, amounts in SEK millions, fiscal year ends 31 December. Non-operating items matter here: the equity-accounted share of Polestar's results and impairments of the Polestar stake, and gains or losses on other Geely-related holdings; keep them out of core operating margins and report them under non_operating. Ownership: Geely Holding owns the large majority of shares and all A shares, so free float is limited; note any changes in Geely's stake and insider dealings. Leverage: separate industrial net cash/debt from any customer-financing liabilities where the annual report does so. Valuation uses the VOLCAR B price in SEK; the base_currency view is EUR."
+}
