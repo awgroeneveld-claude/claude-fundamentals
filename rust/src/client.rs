@@ -22,7 +22,8 @@ use serde_json::{json, Value};
 
 use crate::checks::consistency_warnings;
 use crate::models::{validate_ranges, AnalysisRequest, AnalysisResponse, ImageAttachment};
-use crate::sse::{Message, MessageAccumulator, SseParser, StreamError};
+use crate::sse::{Message, MessageAccumulator, Progress, SseParser, StreamError};
+use std::sync::Arc;
 
 pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
 pub const DEFAULT_EFFORT: &str = "high"; // Opus 5.5 defaults to "medium"; set explicitly
@@ -101,7 +102,19 @@ pub struct AnalysisResult {
     pub request_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+/// Receives progress notices while a turn streams (searches, fetches, output growth).
+pub type ProgressSink = Arc<dyn Fn(&Progress) + Send + Sync>;
+
+/// A sink that logs each notice to stderr with a timestamp offset.
+pub fn stderr_progress() -> ProgressSink {
+    let start = Instant::now();
+    Arc::new(move |p: &Progress| {
+        let t = start.elapsed().as_secs();
+        eprintln!("[{:>3}:{:02}] {p}", t / 60, t % 60);
+    })
+}
+
+#[derive(Clone)]
 pub struct Config {
     pub api_key: String,
     pub base_url: String,
@@ -114,6 +127,23 @@ pub struct Config {
     /// true: send the schema as `output_config.format` (API-side grammar). false: append the schema
     /// to the system prompt and rely on client-side validation (use if the API rejects the grammar).
     pub enforce_schema: bool,
+    /// Optional progress sink; `stderr_progress()` prints to stderr. None = silent.
+    pub progress: Option<ProgressSink>,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("effort", &self.effort)
+            .field("max_tokens", &self.max_tokens)
+            .field("use_server_fallbacks", &self.use_server_fallbacks)
+            .field("show_thinking_summary", &self.show_thinking_summary)
+            .field("enforce_schema", &self.enforce_schema)
+            .field("progress", &self.progress.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Config {
@@ -132,6 +162,7 @@ impl Config {
             show_thinking_summary: false,
             system_prompt: SYSTEM_PROMPT.into(),
             enforce_schema: true,
+            progress: None,
         })
     }
 }
@@ -433,7 +464,11 @@ impl FundamentalsClient {
         while let Some(chunk) = stream.next().await {
             parser.push(&chunk?);
             while let Some(ev) = parser.next_event() {
-                acc.apply(&ev)?;
+                if let Some(progress) = acc.apply_with_progress(&ev)? {
+                    if let Some(sink) = &self.cfg.progress {
+                        sink(&progress);
+                    }
+                }
             }
         }
         if !acc.is_done() {

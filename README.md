@@ -224,6 +224,27 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+**Runtime and progress.** A web-research run at `high` effort typically takes 10 to 20 minutes:
+searches, fetching annual reports, thinking, then 15k to 40k tokens of JSON. The connection stays
+alive through the API's ping events. Both CLIs log progress to stderr by default (`--quiet` turns
+it off): turn start, each search query and fetched URL, result counts, output size every 2k
+characters, and the stop reason. In the Rust library set `Config.progress` to
+`fundamentals_client::stderr_progress()` or your own `Arc<dyn Fn(&Progress)>`; in Python pass
+`progress=callable` to `FundamentalsClient`. A typical log:
+
+```
+starting analysis of ASML (effort high, web research true)
+[  0:01] turn started (claude-opus-5-5, msg_01...)
+[  0:01] thinking...
+[  0:24] web_search: ASML 2024 annual report consolidated income statement
+[  0:29] web_search returned 10 results
+[  0:41] web_fetch: https://www.asml.com/.../annual-report-2024.pdf
+[  1:38] web_fetch returned https://www.asml.com/.../annual-report-2024.pdf
+...
+[ 9:12] writing output: 2000 chars
+[11:40] turn ended: end_turn (23810 output tokens)
+```
+
 Error variants to match on: `Error::Refused { category, explanation }`, `Error::Incomplete`
 (max_tokens or a turn that never completed), `Error::Api { status, .. }` (4xx/5xx after retries),
 `Error::Transport`, `Error::Parse`, `Error::Range`. 429 / 5xx / connection errors are retried up to

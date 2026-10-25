@@ -40,6 +40,9 @@ enum Cmd {
         /// Do not send the schema as output_config.format; put it in the prompt and validate client-side
         #[arg(long)]
         no_schema_enforcement: bool,
+        /// Suppress the progress log on stderr
+        #[arg(long)]
+        quiet: bool,
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
@@ -69,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
             max_tokens,
             no_fallbacks,
             no_schema_enforcement,
+            quiet,
         } => {
             let text = std::fs::read_to_string(&request)
                 .with_context(|| format!("reading {}", request.display()))?;
@@ -80,6 +84,13 @@ async fn main() -> anyhow::Result<()> {
             cfg.max_tokens = max_tokens;
             cfg.use_server_fallbacks = !no_fallbacks;
             cfg.enforce_schema = !no_schema_enforcement;
+            if !quiet {
+                cfg.progress = Some(fundamentals_client::stderr_progress());
+                eprintln!(
+                    "starting analysis of {} (effort {}, web research {})",
+                    req.symbol, cfg.effort, req.allow_web_research
+                );
+            }
             let client = FundamentalsClient::new(cfg)?;
 
             let base_dir = request

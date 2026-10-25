@@ -31,7 +31,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import anthropic
 
@@ -162,6 +162,7 @@ class FundamentalsClient:
         use_server_fallbacks: bool = True,
         show_thinking_summary: bool = False,
         enforce_schema: bool = True,
+        progress: Callable[[str], None] | None = None,
     ):
         """`enforce_schema=False` drops `output_config.format` (API-side grammar) and instead appends the
         schema to the system prompt; the reply is still validated client-side. Use it if the API
@@ -174,6 +175,7 @@ class FundamentalsClient:
         self.use_server_fallbacks = use_server_fallbacks
         self.show_thinking_summary = show_thinking_summary
         self.enforce_schema = enforce_schema
+        self.progress = progress  # called with a one-line notice per search / fetch / output milestone
         if not enforce_schema:
             from anthropic.lib._parse._transform import transform_schema
 
@@ -183,6 +185,41 @@ class FundamentalsClient:
             )
 
     # ------------------------------------------------------------------ #
+    def _report_progress(self, stream: Any) -> None:
+        """Walk the raw stream events and emit one-line notices; get_final_message() still works after."""
+        started = time.monotonic()
+        reported_chars = 0
+
+        def say(msg: str) -> None:
+            t = int(time.monotonic() - started)
+            self.progress(f"[{t // 60:>3}:{t % 60:02}] {msg}")  # type: ignore[misc]
+
+        for event in stream:
+            et = event.type
+            if et == "message_start":
+                say(f"turn started ({event.message.model}, {event.message.id})")
+            elif et == "content_block_start":
+                b = event.content_block
+                if b.type == "thinking":
+                    say("thinking...")
+                elif b.type == "web_search_tool_result":
+                    n = len(b.content) if isinstance(b.content, list) else 0
+                    say(f"web_search returned {n} results")
+                elif b.type == "web_fetch_tool_result":
+                    say("web_fetch returned document")
+            elif et == "content_block_stop":
+                b = event.content_block
+                if b.type in ("server_tool_use", "tool_use"):
+                    inp = b.input if isinstance(b.input, dict) else {}
+                    say(f"{b.name}: {inp.get('query') or inp.get('url') or inp}")
+            elif et == "text":
+                total = len(event.snapshot)
+                if total >= reported_chars + 2000:
+                    reported_chars = total
+                    say(f"writing output: {total} chars")
+            elif et == "message_delta":
+                say(f"turn ended: {event.delta.stop_reason} ({event.usage.output_tokens} output tokens)")
+
     def analyze(
         self, req: AnalysisRequest, today: str | None = None, image_base_dir: Path | None = None
     ) -> AnalysisResult:
@@ -218,6 +255,8 @@ class FundamentalsClient:
         final = None
         for attempt in range(MAX_PAUSE_RESUMES + 1):
             with self.client.beta.messages.stream(messages=messages, **kwargs) as stream:
+                if self.progress:
+                    self._report_progress(stream)
                 final = stream.get_final_message()
             usage.add(final.usage)
             if getattr(final, "_request_id", None):

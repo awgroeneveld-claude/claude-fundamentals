@@ -47,8 +47,15 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from .client import AnalysisIncomplete, AnalysisRefused, FundamentalsClient
 
     req = AnalysisRequest.model_validate_json(Path(args.request).read_text(encoding="utf-8"))
+    progress = None if args.quiet else (lambda line: print(line, file=sys.stderr, flush=True))
+    if progress:
+        progress(f"starting analysis of {req.symbol} (effort {args.effort}, web research {req.allow_web_research})")
     client = FundamentalsClient(
-        model=args.model, effort=args.effort, max_tokens=args.max_tokens, enforce_schema=not args.no_schema_enforcement
+        model=args.model,
+        effort=args.effort,
+        max_tokens=args.max_tokens,
+        enforce_schema=not args.no_schema_enforcement,
+        progress=progress,
     )
     try:
         result = client.analyze(req, image_base_dir=Path(args.request).resolve().parent)
@@ -111,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="do not send the schema as output_config.format; put it in the prompt and validate client-side",
     )
+    a.add_argument("--quiet", action="store_true", help="suppress the progress log on stderr")
     a.set_defaults(fn=cmd_analyze)
 
     s = sub.add_parser("schema", help="export JSON Schemas for request and response")

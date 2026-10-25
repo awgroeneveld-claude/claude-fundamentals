@@ -102,8 +102,29 @@ impl Message {
     }
 }
 
+/// Human-readable progress derived from the stream, for logging while a long turn runs.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Progress {
+    /// A turn started (message id, model).
+    TurnStart { id: String, model: String },
+    /// Claude is thinking (one notice per thinking block).
+    Thinking,
+    /// A server tool was invoked, e.g. web_search with its query or web_fetch with its URL.
+    ToolCall { name: String, detail: String },
+    /// A server tool returned (name, number of results or size hint).
+    ToolResult { name: String, detail: String },
+    /// Output text grew to this many characters (emitted every ~2k chars).
+    TextProgress { chars: usize },
+    /// The turn ended (stop reason, output tokens so far).
+    TurnEnd {
+        stop_reason: String,
+        output_tokens: u64,
+    },
+}
+
 #[derive(Default)]
 pub struct MessageAccumulator {
+    text_chars_reported: usize,
     pub message: Message,
     partial_json: Vec<String>, // per block index, for input_json_delta
     done: bool,
@@ -123,8 +144,13 @@ impl MessageAccumulator {
     }
 
     pub fn apply(&mut self, ev: &SseEvent) -> Result<(), StreamError> {
+        self.apply_with_progress(ev).map(|_| ())
+    }
+
+    /// Like `apply`, but also returns a progress notice when the event is worth reporting.
+    pub fn apply_with_progress(&mut self, ev: &SseEvent) -> Result<Option<Progress>, StreamError> {
         if ev.data.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
         let v: Value = serde_json::from_str(&ev.data)
             .map_err(|e| StreamError::Malformed(format!("{e}: {}", ev.data)))?;
@@ -147,6 +173,10 @@ impl MessageAccumulator {
                 if let Some(Value::Object(u)) = m.get("usage") {
                     merge_usage(&mut self.message.usage, u);
                 }
+                return Ok(Some(Progress::TurnStart {
+                    id: self.message.id.clone(),
+                    model: self.message.model.clone(),
+                }));
             }
             "content_block_start" => {
                 let idx = index_of(&v)?;
@@ -155,7 +185,37 @@ impl MessageAccumulator {
                     self.message.content.push(json!({}));
                     self.partial_json.push(String::new());
                 }
+                let btype = block
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let result_detail = match btype.as_str() {
+                    "web_search_tool_result" => Some(format!(
+                        "{} results",
+                        block
+                            .get("content")
+                            .and_then(Value::as_array)
+                            .map(|a| a.len())
+                            .unwrap_or(0)
+                    )),
+                    "web_fetch_tool_result" => Some(
+                        block
+                            .pointer("/content/url")
+                            .and_then(Value::as_str)
+                            .unwrap_or("document")
+                            .to_string(),
+                    ),
+                    _ => None,
+                };
                 self.message.content[idx] = block;
+                if btype == "thinking" {
+                    return Ok(Some(Progress::Thinking));
+                }
+                if let Some(detail) = result_detail {
+                    let name = btype.trim_end_matches("_tool_result").to_string();
+                    return Ok(Some(Progress::ToolResult { name, detail }));
+                }
             }
             "content_block_delta" => {
                 let idx = index_of(&v)?;
@@ -166,7 +226,18 @@ impl MessageAccumulator {
                     StreamError::Malformed(format!("delta for unknown block {idx}"))
                 })?;
                 match delta.get("type").and_then(Value::as_str).unwrap_or("") {
-                    "text_delta" => append_str(block, "text", delta.get("text")),
+                    "text_delta" => {
+                        append_str(block, "text", delta.get("text"));
+                        let chars = block
+                            .get("text")
+                            .and_then(Value::as_str)
+                            .map(str::len)
+                            .unwrap_or(0);
+                        if chars >= self.text_chars_reported + 2000 {
+                            self.text_chars_reported = chars;
+                            return Ok(Some(Progress::TextProgress { chars }));
+                        }
+                    }
                     "thinking_delta" => append_str(block, "thinking", delta.get("thinking")),
                     "signature_delta" => {
                         if let Some(s) = delta.get("signature").and_then(Value::as_str) {
@@ -208,7 +279,19 @@ impl MessageAccumulator {
                         serde_json::from_str(&partial)
                             .map_err(|e| StreamError::Malformed(format!("tool input json: {e}")))?
                     };
+                    let name = block
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("tool")
+                        .to_string();
+                    let detail = input
+                        .get("query")
+                        .or_else(|| input.get("url"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                        .unwrap_or_else(|| input.to_string());
                     block["input"] = input;
+                    return Ok(Some(Progress::ToolCall { name, detail }));
                 }
             }
             "message_delta" => {
@@ -225,13 +308,43 @@ impl MessageAccumulator {
                 if let Some(Value::Object(u)) = v.get("usage") {
                     merge_usage(&mut self.message.usage, u);
                 }
+                return Ok(Some(Progress::TurnEnd {
+                    stop_reason: self.message.stop_reason.clone().unwrap_or_default(),
+                    output_tokens: self
+                        .message
+                        .usage
+                        .get("output_tokens")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0),
+                }));
             }
             "message_stop" => self.done = true,
             "ping" => {}
             "error" => return Err(StreamError::ApiError(v.get("error").cloned().unwrap_or(v))),
             _ => {}
         }
-        Ok(())
+        Ok(None)
+    }
+}
+
+impl std::fmt::Display for Progress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Progress::TurnStart { id, model } => write!(f, "turn started ({model}, {id})"),
+            Progress::Thinking => write!(f, "thinking..."),
+            Progress::ToolCall { name, detail } => write!(f, "{name}: {detail}"),
+            Progress::ToolResult { name, detail } => write!(f, "{name} returned {detail}"),
+            Progress::TextProgress { chars } => write!(f, "writing output: {chars} chars"),
+            Progress::TurnEnd {
+                stop_reason,
+                output_tokens,
+            } => {
+                write!(
+                    f,
+                    "turn ended: {stop_reason} ({output_tokens} output tokens)"
+                )
+            }
+        }
     }
 }
 
@@ -315,6 +428,29 @@ mod tests {
             assert_eq!(m.usage["output_tokens"], 42);
             assert_eq!(m.usage["server_tool_use"]["web_search_requests"], 1);
         }
+    }
+
+    #[test]
+    fn progress_notices_are_emitted() {
+        let mut p = SseParser::default();
+        let mut acc = MessageAccumulator::default();
+        p.push(STREAM.as_bytes());
+        let mut seen = Vec::new();
+        while let Some(ev) = p.next_event() {
+            if let Some(pr) = acc.apply_with_progress(&ev).unwrap() {
+                seen.push(pr.to_string());
+            }
+        }
+        assert_eq!(seen[0], "turn started (claude-opus-5-5, msg_1)");
+        assert!(seen.contains(&"thinking...".to_string()));
+        assert!(
+            seen.contains(&"web_search: ASML 10-K".to_string()),
+            "{seen:?}"
+        );
+        assert_eq!(
+            seen.last().unwrap(),
+            "turn ended: end_turn (42 output tokens)"
+        );
     }
 
     #[test]

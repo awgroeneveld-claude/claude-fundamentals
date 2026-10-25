@@ -23,6 +23,7 @@ fn cfg() -> Config {
         show_thinking_summary: false,
         system_prompt: fundamentals_client::client::SYSTEM_PROMPT.into(),
         enforce_schema: true,
+        progress: None,
     }
 }
 
