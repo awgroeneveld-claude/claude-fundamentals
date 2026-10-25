@@ -145,3 +145,39 @@ fn no_tools_when_web_research_disabled() {
     let body = client.build_body(&req, &[]);
     assert!(body.get("tools").is_none());
 }
+
+#[test]
+fn images_become_blocks_before_the_text() {
+    use base64::Engine;
+    let dir = std::env::temp_dir().join(format!("fc-img-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // 1x1 transparent PNG
+    let png = base64::engine::general_purpose::STANDARD
+        .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+        .unwrap();
+    std::fs::write(dir.join("ib.png"), &png).unwrap();
+
+    let text =
+        std::fs::read_to_string(root().join("examples/request_with_screenshots.json")).unwrap();
+    let mut req: AnalysisRequest = serde_json::from_str(&text).unwrap();
+    assert_eq!(req.images.len(), 2);
+    for img in &mut req.images {
+        img.path = Some("ib.png".into());
+    }
+    let content = fundamentals_client::build_user_content(&req, "2026-10-25", Some(&dir)).unwrap();
+    let blocks = content.as_array().unwrap();
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks[0]["type"], "image");
+    assert_eq!(blocks[0]["source"]["media_type"], "image/png");
+    assert!(blocks[0]["source"]["data"]
+        .as_str()
+        .unwrap()
+        .starts_with("iVBOR"));
+    let t = blocks[2]["text"].as_str().unwrap();
+    assert!(t.contains("2 screenshot(s) are attached"));
+    assert!(
+        !t.contains("\"images\""),
+        "image payload must not be duplicated in the JSON text"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

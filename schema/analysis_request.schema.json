@@ -23,6 +23,59 @@
       "title": "Frequency",
       "type": "string"
     },
+    "ImageAttachment": {
+      "additionalProperties": false,
+      "description": "A screenshot (e.g. Interactive Brokers fundamentals / ownership pages) sent as an image block.\n\nProvide either `path` (resolved by the CLI relative to the request file) or `data` (base64).\nSupported: image/png, image/jpeg, image/gif, image/webp; <= 5 MB each, at most 100 per request.\nKeep the long edge <= 1568 px: larger images are downscaled server-side anyway.",
+      "properties": {
+        "media_type": {
+          "default": "image/png",
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path; the CLI reads and base64-encodes it",
+          "title": "Path"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base64-encoded image bytes (no data: prefix)",
+          "title": "Data"
+        },
+        "caption": {
+          "description": "What the image shows and when it was captured, e.g. 'IB TWS > Fundamentals > Financial Summary, annual, captured 2026-10-20'",
+          "title": "Caption",
+          "type": "string"
+        }
+      },
+      "required": [
+        "caption"
+      ],
+      "title": "ImageAttachment",
+      "type": "object"
+    },
     "MeasureId": {
       "enum": [
         "share_price",
@@ -243,6 +296,14 @@
       "default": null,
       "description": "Raw financial-statement data from your own provider (any JSON shape; describe units/periods inside it). When present, it is the preferred source.",
       "title": "Supplied Data"
+    },
+    "images": {
+      "description": "Screenshots to read figures from; sent as image blocks, not inside the JSON payload.",
+      "items": {
+        "$ref": "#/$defs/ImageAttachment"
+      },
+      "title": "Images",
+      "type": "array"
     },
     "notes": {
       "anyOf": [

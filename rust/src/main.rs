@@ -77,7 +77,15 @@ async fn main() -> anyhow::Result<()> {
             cfg.use_server_fallbacks = !no_fallbacks;
             let client = FundamentalsClient::new(cfg)?;
 
-            let result = match client.analyze(&req).await {
+            let base_dir = request
+                .canonicalize()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+            let today = fundamentals_client::client::today_iso();
+            let result = match client
+                .analyze_dated(&req, &today, base_dir.as_deref())
+                .await
+            {
                 Ok(r) => r,
                 Err(Error::Refused {
                     category,

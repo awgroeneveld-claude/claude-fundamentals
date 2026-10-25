@@ -195,6 +195,7 @@ class SourceType(str, Enum):
     company_ir = "company_ir"  # company IR site, earnings release, presentation
     aggregator = "aggregator"  # Yahoo Finance, Morningstar, Macrotrends, etc.
     supplied_input = "supplied_input"  # data the calling app passed in the request
+    supplied_screenshot = "supplied_screenshot"  # figure read from an image the caller attached (e.g. IB)
     web_other = "web_other"  # any other web page
     model_recall = "model_recall"  # no retrievable source; from the model's memory
 
@@ -241,6 +242,23 @@ class Period(Strict):
     end: str = Field(description="ISO date, inclusive, e.g. 2025-12-31")
 
 
+class ImageAttachment(Strict):
+    """A screenshot (e.g. Interactive Brokers fundamentals / ownership pages) sent as an image block.
+
+    Provide either `path` (resolved by the CLI relative to the request file) or `data` (base64).
+    Supported: image/png, image/jpeg, image/gif, image/webp; <= 5 MB each, at most 100 per request.
+    Keep the long edge <= 1568 px: larger images are downscaled server-side anyway.
+    """
+
+    media_type: Literal["image/png", "image/jpeg", "image/gif", "image/webp"] = "image/png"
+    path: str | None = Field(default=None, description="File path; the CLI reads and base64-encodes it")
+    data: str | None = Field(default=None, description="Base64-encoded image bytes (no data: prefix)")
+    caption: str = Field(
+        description="What the image shows and when it was captured, e.g. "
+        "'IB TWS > Fundamentals > Financial Summary, annual, captured 2026-10-20'"
+    )
+
+
 class AnalysisRequest(Strict):
     symbol: str = Field(description="Ticker symbol, e.g. AAPL, ASML, 'ASML.AS'")
     exchange: str | None = Field(default=None, description="Exchange hint, e.g. NASDAQ, Euronext Amsterdam")
@@ -267,6 +285,10 @@ class AnalysisRequest(Strict):
         default=None,
         description="Raw financial-statement data from your own provider (any JSON shape; "
         "describe units/periods inside it). When present, it is the preferred source.",
+    )
+    images: list[ImageAttachment] = Field(
+        default_factory=list,
+        description="Screenshots to read figures from; sent as image blocks, not inside the JSON payload.",
     )
     notes: str | None = Field(default=None, description="Free-text instructions within the framework's scope.")
 

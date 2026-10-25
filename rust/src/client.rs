@@ -10,7 +10,10 @@
 //!   * `pause_turn` resumed by echoing the partial assistant turn; `refusal` / `max_tokens` surfaced.
 //!   * System prompt first with `cache_control` so repeated calls hit the prompt cache.
 
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+
+use base64::Engine;
 
 use futures_util::StreamExt;
 use reqwest::StatusCode;
@@ -18,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::checks::consistency_warnings;
-use crate::models::{validate_ranges, AnalysisRequest, AnalysisResponse};
+use crate::models::{validate_ranges, AnalysisRequest, AnalysisResponse, ImageAttachment};
 use crate::sse::{Message, MessageAccumulator, SseParser, StreamError};
 
 pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
@@ -57,6 +60,8 @@ pub enum Error {
     Parse(#[from] serde_json::Error),
     #[error("response out of range: {0:?}")]
     Range(Vec<String>),
+    #[error("invalid input: {0}")]
+    Input(String),
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -140,16 +145,84 @@ pub fn web_tools() -> Vec<Value> {
     ]
 }
 
-/// The volatile part of the prompt; the system prompt stays byte-identical so it caches.
+/// The volatile text part of the prompt; the system prompt stays byte-identical so it caches.
 pub fn build_user_message(req: &AnalysisRequest, today: &str) -> String {
-    let payload = serde_json::to_string_pretty(req).expect("request serialises");
+    // Images are sent as separate blocks, never inside the JSON payload.
+    let mut payload = serde_json::to_value(req).expect("request serialises");
+    payload.as_object_mut().map(|o| o.remove("images"));
+    let payload = serde_json::to_string_pretty(&payload).expect("request serialises");
     let mut s = format!(
         "Analysis date: {today}\nAnalyse the following request using the framework and return the structured result.\n\n```json\n{payload}\n```"
     );
-    if !req.allow_web_research && req.supplied_data.is_none() {
+    if !req.images.is_empty() {
+        s.push_str(&format!(
+            "\n\n{} screenshot(s) are attached before this text, in this order:",
+            req.images.len()
+        ));
+        for (i, img) in req.images.iter().enumerate() {
+            s.push_str(&format!("\n  {}. {}", i + 1, img.caption));
+        }
+        s.push_str("\nRead figures from them per the screenshot rules; register each as a supplied_screenshot source.");
+    }
+    if !req.allow_web_research && req.supplied_data.is_none() && req.images.is_empty() {
         s.push_str("\n\nWeb research is disabled and no data was supplied: use recall_only mode and cap reliability at 35.");
     }
     s
+}
+
+const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+const MAX_IMAGES: usize = 100;
+
+fn image_data(img: &ImageAttachment, base_dir: Option<&Path>) -> Result<String, Error> {
+    if let Some(d) = &img.data {
+        return Ok(d.clone());
+    }
+    let Some(p) = &img.path else {
+        return Err(Error::Input(format!(
+            "image '{}' has neither data nor path",
+            img.caption
+        )));
+    };
+    let mut path = PathBuf::from(p);
+    if path.is_relative() {
+        if let Some(b) = base_dir {
+            path = b.join(path);
+        }
+    }
+    let raw = std::fs::read(&path).map_err(|e| Error::Input(format!("{}: {e}", path.display())))?;
+    if raw.len() > MAX_IMAGE_BYTES {
+        return Err(Error::Input(format!(
+            "{}: image exceeds the 5 MB API limit",
+            path.display()
+        )));
+    }
+    Ok(base64::engine::general_purpose::STANDARD.encode(raw))
+}
+
+/// User-message `content`: a plain string without images, otherwise image blocks then the text block.
+pub fn build_user_content(
+    req: &AnalysisRequest,
+    today: &str,
+    base_dir: Option<&Path>,
+) -> Result<Value, Error> {
+    let text = build_user_message(req, today);
+    if req.images.is_empty() {
+        return Ok(Value::String(text));
+    }
+    if req.images.len() > MAX_IMAGES {
+        return Err(Error::Input(format!(
+            "at most {MAX_IMAGES} images per request"
+        )));
+    }
+    let mut blocks = Vec::with_capacity(req.images.len() + 1);
+    for img in &req.images {
+        blocks.push(json!({
+            "type": "image",
+            "source": {"type": "base64", "media_type": img.media_type, "data": image_data(img, base_dir)?}
+        }));
+    }
+    blocks.push(json!({"type": "text", "text": text}));
+    Ok(Value::Array(blocks))
 }
 
 impl FundamentalsClient {
@@ -202,18 +275,22 @@ impl FundamentalsClient {
             .then_some("server-side-fallback-2026-07-01")
     }
 
+    /// Run an analysis. Relative `images[].path` entries resolve against the process working directory.
     pub async fn analyze(&self, req: &AnalysisRequest) -> Result<AnalysisResult, Error> {
         let today = today_iso();
-        self.analyze_dated(req, &today).await
+        self.analyze_dated(req, &today, None).await
     }
 
+    /// `image_base_dir` resolves relative `images[].path` entries (the CLI passes the request file's dir).
     pub async fn analyze_dated(
         &self,
         req: &AnalysisRequest,
         today: &str,
+        image_base_dir: Option<&Path>,
     ) -> Result<AnalysisResult, Error> {
         let started = Instant::now();
-        let mut messages = vec![json!({"role": "user", "content": build_user_message(req, today)})];
+        let content = build_user_content(req, today, image_base_dir)?;
+        let mut messages = vec![json!({"role": "user", "content": content})];
         let mut usage = Usage::default();
         let mut request_ids = Vec::new();
         let mut final_msg: Option<Message> = None;

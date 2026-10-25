@@ -223,6 +223,39 @@ pub struct Period {
     pub end: String,
 }
 
+/// Supported image media types for screenshot attachments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImageMediaType {
+    #[serde(rename = "image/png")]
+    Png,
+    #[serde(rename = "image/jpeg")]
+    Jpeg,
+    #[serde(rename = "image/gif")]
+    Gif,
+    #[serde(rename = "image/webp")]
+    Webp,
+}
+
+/// A screenshot (e.g. Interactive Brokers fundamentals / ownership pages) sent as an image block.
+/// Provide either `path` (resolved against the request file's directory by the CLI) or `data`
+/// (base64, no `data:` prefix). <= 5 MB each, at most 100 per request, long edge <= 1568 px.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageAttachment {
+    #[serde(default = "default_png")]
+    pub media_type: ImageMediaType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// What the image shows and when it was captured.
+    pub caption: String,
+}
+
+fn default_png() -> ImageMediaType {
+    ImageMediaType::Png
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnalysisRequest {
@@ -248,6 +281,8 @@ pub struct AnalysisRequest {
     pub allow_web_research: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplied_data: Option<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<ImageAttachment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 }
@@ -294,6 +329,7 @@ impl AnalysisRequest {
             sector_hint: None,
             allow_web_research: true,
             supplied_data: None,
+            images: vec![],
             notes: None,
         }
     }

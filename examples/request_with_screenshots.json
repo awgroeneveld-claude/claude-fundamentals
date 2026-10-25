@@ -1,0 +1,22 @@
+{
+  "symbol": "ASML",
+  "exchange": "Euronext Amsterdam",
+  "reporting_currency": "EUR",
+  "period": { "start": "2019-01-01", "end": "2025-12-31" },
+  "frequency": "annual",
+  "categories": ["valuation", "profitability", "leverage", "cash_flow_quality", "growth", "ownership"],
+  "allow_web_research": true,
+  "images": [
+    {
+      "media_type": "image/png",
+      "path": "screenshots/asml_ib_financial_summary.png",
+      "caption": "IB TWS > Fundamentals > Financial Summary (annual, EUR millions), captured 2026-10-20"
+    },
+    {
+      "media_type": "image/png",
+      "path": "screenshots/asml_ib_ownership.png",
+      "caption": "IB TWS > Fundamentals > Ownership (top holders, institutional and insider %), captured 2026-10-20"
+    }
+  ],
+  "notes": "Use the screenshots for ownership; cross-check the financial summary against the latest annual report."
+}

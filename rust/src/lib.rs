@@ -7,7 +7,10 @@ pub mod models;
 pub mod sse;
 
 pub use checks::consistency_warnings;
-pub use client::{build_user_message, AnalysisResult, Config, Error, FundamentalsClient, Usage};
+pub use client::{
+    build_user_content, build_user_message, AnalysisResult, Config, Error, FundamentalsClient,
+    Usage,
+};
 pub use models::{
     AnalysisRequest, AnalysisResponse, Category, Frequency, MeasureId, Period, Signal,
 };

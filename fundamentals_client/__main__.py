@@ -49,7 +49,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     req = AnalysisRequest.model_validate_json(Path(args.request).read_text(encoding="utf-8"))
     client = FundamentalsClient(model=args.model, effort=args.effort, max_tokens=args.max_tokens)
     try:
-        result = client.analyze(req)
+        result = client.analyze(req, image_base_dir=Path(args.request).resolve().parent)
     except AnalysisRefused as e:
         print(f"refused: {e}", file=sys.stderr)
         return 3

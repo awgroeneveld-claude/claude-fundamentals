@@ -26,6 +26,7 @@ Design notes
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 from dataclasses import dataclass, field
@@ -95,8 +96,8 @@ def load_system_prompt(path: Path = PROMPT_PATH) -> str:
 
 
 def build_user_message(req: AnalysisRequest, today: str) -> str:
-    """The volatile part of the prompt. Keep the system prompt untouched so it stays cached."""
-    payload = req.model_dump(mode="json", exclude_none=True)
+    """The volatile text part of the prompt. Keep the system prompt untouched so it stays cached."""
+    payload = req.model_dump(mode="json", exclude_none=True, exclude={"images"})
     lines = [
         f"Analysis date: {today}",
         "Analyse the following request using the framework and return the structured result.",
@@ -105,11 +106,49 @@ def build_user_message(req: AnalysisRequest, today: str) -> str:
         json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False),
         "```",
     ]
-    if not req.allow_web_research and req.supplied_data is None:
+    if req.images:
+        lines.append("")
+        lines.append(f"{len(req.images)} screenshot(s) are attached before this text, in this order:")
+        for i, img in enumerate(req.images, 1):
+            lines.append(f"  {i}. {img.caption}")
+        lines.append("Read figures from them per the screenshot rules; register each as a supplied_screenshot source.")
+    if not req.allow_web_research and req.supplied_data is None and not req.images:
         lines.append(
             "\nWeb research is disabled and no data was supplied: use recall_only mode and cap reliability at 35."
         )
     return "\n".join(lines)
+
+
+def _image_data(img: Any, base_dir: Path | None) -> str:
+    if img.data:
+        return img.data
+    if not img.path:
+        raise ValueError(f"image '{img.caption}' has neither data nor path")
+    path = Path(img.path)
+    if not path.is_absolute() and base_dir is not None:
+        path = base_dir / path
+    raw = path.read_bytes()
+    if len(raw) > 5 * 1024 * 1024:
+        raise ValueError(f"{path}: image exceeds the 5 MB API limit")
+    return base64.standard_b64encode(raw).decode("ascii")
+
+
+def build_user_content(req: AnalysisRequest, today: str, base_dir: Path | None = None) -> str | list[dict[str, Any]]:
+    """Plain string when there are no images; otherwise image blocks first, then the text block."""
+    text = build_user_message(req, today)
+    if not req.images:
+        return text
+    if len(req.images) > 100:
+        raise ValueError("at most 100 images per request")
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": img.media_type, "data": _image_data(img, base_dir)},
+        }
+        for img in req.images
+    ]
+    blocks.append({"type": "text", "text": text})
+    return blocks
 
 
 class FundamentalsClient:
@@ -132,9 +171,14 @@ class FundamentalsClient:
         self.show_thinking_summary = show_thinking_summary
 
     # ------------------------------------------------------------------ #
-    def analyze(self, req: AnalysisRequest, today: str | None = None) -> AnalysisResult:
+    def analyze(
+        self, req: AnalysisRequest, today: str | None = None, image_base_dir: Path | None = None
+    ) -> AnalysisResult:
+        """`image_base_dir` resolves relative `images[].path` entries (the CLI passes the request file's dir)."""
         today = today or time.strftime("%Y-%m-%d")
-        messages: list[dict[str, Any]] = [{"role": "user", "content": build_user_message(req, today)}]
+        messages: list[dict[str, Any]] = [
+            {"role": "user", "content": build_user_content(req, today, image_base_dir)}
+        ]
         tools = WEB_TOOLS if req.allow_web_research else []
 
         kwargs: dict[str, Any] = dict(

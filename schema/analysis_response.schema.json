@@ -845,6 +845,7 @@
         "company_ir",
         "aggregator",
         "supplied_input",
+        "supplied_screenshot",
         "web_other",
         "model_recall"
       ],

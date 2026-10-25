@@ -58,14 +58,21 @@ validation. The Python CLI has `--yaml` for that.
   `rust/src/models.rs`).
 * `supplied_data` is free-form JSON from your own data provider. When present it is the preferred
   source and reliabilities go to the 95-100 band. See `examples/request_supplied_data.json`.
-* `allow_web_research` lets Claude use Anthropic's server-side `web_search` / `web_fetch` tools to
-  find filings. Slower and costlier, but the only option when you supply nothing.
+* `allow_web_research` (default true, **the primary data mode for this project**) lets Claude use
+  Anthropic's server-side `web_search` / `web_fetch` tools to find filings and aggregator pages.
+* `images` attaches screenshots, typically Interactive Brokers TWS or Client Portal fundamentals and
+  ownership pages. Each entry has a `media_type`, a `path` (resolved relative to the request file by
+  the CLIs) or base64 `data`, and a `caption` saying what the page is and when it was captured. The
+  images travel as image blocks ahead of the request text, never inside the JSON. Limits: PNG, JPEG,
+  GIF or WebP, 5 MB each, 100 per request; keep the long edge at or below 1568 px. See
+  `examples/request_with_screenshots.json`. Screenshots are the practical route to IB's ownership
+  and insider data, which the framework notes is hard to get by API.
 
 **Response** (`schema/analysis_response.schema.json`, enforced by the API). Top level:
 
 ```
 schema_version, request (echo), analysis_date, data_mode (supplied|retrieved|mixed|recall_only),
-sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|web_other|model_recall), title, url, period_covered, retrieved_at
+sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|supplied_screenshot|web_other|model_recall), title, url, period_covered, retrieved_at
 measures[]       measure_id, category, label, unit, currency, scale,
                  latest {period_end, period_type, value|null, reliability_pct, method, source_ids[]},
                  series[] (same shape, oldest first),
@@ -93,7 +100,7 @@ lives in `prompts/system_prompt.md`:
 | Band | Meaning |
 |---|---|
 | 95-100 | Read directly from `supplied_data` or a primary filing, period matches, units unambiguous |
-| 80-94 | Derived arithmetically from 95-100 inputs, or one reputable aggregator corroborated by a second source |
+| 80-94 | Derived arithmetically from 95-100 inputs, one reputable aggregator corroborated by a second source, or a legible dated screenshot of a reputable terminal such as IB |
 | 60-79 | Derived with one documented assumption, or a single aggregator |
 | 40-59 | Stale, conflicting sources resolved by judgement, or denominator itself 60-79 |
 | 1-39 | From memory or extrapolated (`method: estimated`) |
@@ -170,6 +177,7 @@ cargo test                                  # offline tests, no key needed
 export ANTHROPIC_API_KEY=...                # see "API key handling" below
 ./target/release/fundamentals analyze ../examples/request_asml.json --out ../out/asml.json
 ./target/release/fundamentals analyze ../examples/request_supplied_data.json --effort medium
+./target/release/fundamentals analyze ../examples/request_with_screenshots.json   # after dropping PNGs in examples/screenshots/
 ./target/release/fundamentals check ../out/asml.json     # re-validate + consistency warnings, offline
 ```
 
@@ -185,6 +193,12 @@ async fn main() -> anyhow::Result<()> {
     let mut req = AnalysisRequest::new("ASML", "2016-01-01", "2025-12-31");
     req.categories = vec![Category::Valuation, Category::Profitability, Category::Leverage];
     req.peer_symbols = vec!["AMAT".into(), "LRCX".into()];
+    req.images.push(fundamentals_client::ImageAttachment {
+        media_type: fundamentals_client::models::ImageMediaType::Png,
+        path: Some("/data/ib/asml_ownership.png".into()),
+        data: None,
+        caption: "IB TWS > Fundamentals > Ownership, captured 2026-10-20".into(),
+    });
 
     let result = client.analyze(&req).await?;              // Result<AnalysisResult, fundamentals_client::Error>
     let r = &result.response;                              // typed AnalysisResponse
@@ -239,9 +253,12 @@ test suites (`tests/test_models.py` and `rust/tests/offline.rs` both validate th
 * Don't log request headers; the clients log `request-id` values instead, which is what Anthropic
   support asks for.
 * Rotate on any suspicion of leakage; the Console lets you revoke a key instantly.
-* For the Claude Code cloud environment this repository was developed in: add the key under the
-  environment's *Edit → Network secrets* (or environment variables) as `ANTHROPIC_API_KEY`; new
-  sessions pick it up. Don't paste it into chat.
+* For the Claude Code cloud environment this repository was developed in: open the environment
+  menu in the session title bar, choose Edit, and add `ANTHROPIC_API_KEY` under **Network secrets**
+  (older app versions label it API credentials). That section stores it as a secret; the plain
+  environment-variables field is the one the app discourages for keys. New sessions pick it up.
+  Don't paste the key into chat. If you prefer to keep the key off the cloud environment entirely,
+  run the trial on your own machine from this branch instead.
 
 ## 7. Repository layout
 
@@ -265,9 +282,9 @@ Expect at most prompt-level tuning after the first real runs, not structural cha
 
 Open decisions for you:
 
-1. **Data source.** Supplying your own statements (`supplied_data`) gives 95-100 % reliabilities and
-   cheap, fast calls; web research gives convenience at the cost of lower reliability, latency and
-   price. Most production setups do both: supply what the provider has, allow research for the rest.
+1. **Data source.** Decided: web research is primary, IB screenshots supplement it (ownership and
+   insider data above all). `supplied_data` remains available if a licensed feed is added later and
+   lifts reliabilities into the 95-100 band.
 2. **Peer sets and sector thresholds.** The prompt lets Claude pick peers when you give none; a
    fixed peer list per symbol is more reproducible.
 3. **Calibration logging.** Store every response with its `reliability_pct` values so you can later

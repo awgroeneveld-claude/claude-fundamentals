@@ -63,3 +63,32 @@ def test_consistency_flags_violations():
     w = consistency_warnings(resp)
     assert any("signal reliability" in x for x in w)
     assert any("null value" in x for x in w)
+
+
+def test_images_become_blocks_before_the_text(tmp_path):
+    import base64
+
+    from fundamentals_client.client import build_user_content
+
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    )
+    (tmp_path / "ib.png").write_bytes(png)
+    req = AnalysisRequest.model_validate_json((ROOT / "examples" / "request_with_screenshots.json").read_text())
+    assert len(req.images) == 2
+    for img in req.images:
+        img.path = "ib.png"
+    content = build_user_content(req, "2026-10-25", tmp_path)
+    assert isinstance(content, list) and len(content) == 3
+    assert content[0]["type"] == "image" and content[0]["source"]["media_type"] == "image/png"
+    assert content[0]["source"]["data"].startswith("iVBOR")
+    text = content[2]["text"]
+    assert "2 screenshot(s) are attached" in text
+    assert '"images"' not in text
+
+
+def test_request_without_images_is_plain_string():
+    from fundamentals_client.client import build_user_content
+
+    req = AnalysisRequest.model_validate_json((ROOT / "examples" / "request_asml.json").read_text())
+    assert isinstance(build_user_content(req, "2026-10-25"), str)
