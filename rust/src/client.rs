@@ -496,6 +496,55 @@ fn strip_fences(text: &str) -> &str {
     t
 }
 
+/// Outcome of a schema probe: whether the API compiled the grammar for this schema.
+#[derive(Debug, Clone)]
+pub enum ProbeOutcome {
+    Accepted { input_tokens: u64 },
+    Rejected { message: String },
+}
+
+impl FundamentalsClient {
+    /// Send a minimal non-streaming request (`max_tokens: 1`) whose only purpose is to make the API
+    /// compile the structured-output grammar for `schema`. A rejection costs nothing; an accepted
+    /// probe costs a few hundred input tokens.
+    pub async fn probe_schema(&self, schema: &Value) -> Result<ProbeOutcome, Error> {
+        let url = format!("{}/v1/messages", self.cfg.base_url.trim_end_matches('/'));
+        let body = json!({
+            "model": self.cfg.model,
+            "max_tokens": 1,
+            "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+            "messages": [{"role": "user", "content": "ping"}],
+        });
+        let resp = self
+            .http
+            .post(&url)
+            .header("content-type", "application/json")
+            .header("x-api-key", &self.cfg.api_key)
+            .header("anthropic-version", API_VERSION)
+            .json(&body)
+            .send()
+            .await?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+        if status.is_success() {
+            return Ok(ProbeOutcome::Accepted {
+                input_tokens: v["usage"]["input_tokens"].as_u64().unwrap_or(0),
+            });
+        }
+        let message = v["error"]["message"].as_str().unwrap_or(&text).to_string();
+        if status.as_u16() == 400 && message.to_lowercase().contains("grammar") {
+            return Ok(ProbeOutcome::Rejected { message });
+        }
+        Err(Error::Api {
+            status: status.as_u16(),
+            error_type: v["error"]["type"].as_str().unwrap_or("unknown").to_string(),
+            message,
+            request_id: None,
+        })
+    }
+}
+
 fn is_retryable(e: &Error) -> bool {
     match e {
         Error::Transport(err) => err.is_connect() || err.is_timeout() || err.is_request(),

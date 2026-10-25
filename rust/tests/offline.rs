@@ -344,3 +344,43 @@ fn result_files_from_before_currency_fields_still_load() {
         fundamentals_client::render_report(&resp, &fundamentals_client::ReportOptions::default());
     assert!(rep.markdown.contains("## Currency"));
 }
+
+#[test]
+fn probe_variants_are_valid_subsets() {
+    use fundamentals_client::probe::{describe_size, variants};
+    let full: Value =
+        serde_json::from_str(fundamentals_client::client::RESPONSE_SCHEMA_JSON).unwrap();
+    let vs = variants(&full);
+    assert!(vs.len() >= 10);
+    let full_len = serde_json::to_string(&full).unwrap().len();
+    for v in &vs[1..] {
+        let len = serde_json::to_string(&v.schema).unwrap().len();
+        assert!(
+            len < full_len,
+            "{} not smaller: {}",
+            v.name,
+            describe_size(&v.schema)
+        );
+        // every required name still exists as a property, at every object
+        fn check(o: &Value) {
+            if let Some(obj) = o.as_object() {
+                if let (Some(props), Some(req)) = (obj.get("properties"), obj.get("required")) {
+                    for r in req.as_array().unwrap() {
+                        assert!(
+                            props.get(r.as_str().unwrap()).is_some(),
+                            "dangling required {r}"
+                        );
+                    }
+                }
+                obj.values().for_each(check);
+            } else if let Some(a) = o.as_array() {
+                a.iter().for_each(check);
+            }
+        }
+        check(&v.schema);
+    }
+    let no_enums = vs.iter().find(|v| v.name == "no-enums").unwrap();
+    assert!(!serde_json::to_string(&no_enums.schema)
+        .unwrap()
+        .contains("\"enum\""));
+}

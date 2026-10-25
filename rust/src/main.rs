@@ -51,6 +51,9 @@ enum Cmd {
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
+    /// Send cut-down variants of the response schema to find what the API's grammar compiler rejects.
+    /// Rejections are free; an accepted probe costs a few hundred input tokens.
+    ProbeSchema,
     /// Render a saved response as a Markdown report with charts (offline)
     Report {
         /// AnalysisResponse JSON file
@@ -124,6 +127,32 @@ async fn main() -> anyhow::Result<()> {
             );
             for w in consistency_warnings(&resp) {
                 println!("  warning: {w}");
+            }
+            Ok(())
+        }
+        Cmd::ProbeSchema => {
+            use fundamentals_client::probe::{describe_size, variants};
+            let client = FundamentalsClient::new(Config::from_env()?)?;
+            let full: serde_json::Value =
+                serde_json::from_str(fundamentals_client::client::RESPONSE_SCHEMA_JSON)?;
+            println!("{:<26} {:<10} size / note", "variant", "result");
+            for v in variants(&full) {
+                let size = describe_size(&v.schema);
+                match client.probe_schema(&v.schema).await {
+                    Ok(fundamentals_client::ProbeOutcome::Accepted { input_tokens }) => {
+                        println!(
+                            "{:<26} {:<10} {size} | {} ({} input tokens)",
+                            v.name, "ACCEPTED", v.describe, input_tokens
+                        )
+                    }
+                    Ok(fundamentals_client::ProbeOutcome::Rejected { .. }) => {
+                        println!("{:<26} {:<10} {size} | {}", v.name, "rejected", v.describe)
+                    }
+                    Err(e) => println!(
+                        "{:<26} {:<10} {size} | {}: {e}",
+                        v.name, "ERROR", v.describe
+                    ),
+                }
             }
             Ok(())
         }

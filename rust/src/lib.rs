@@ -5,13 +5,14 @@ pub mod chart;
 pub mod checks;
 pub mod client;
 pub mod models;
+pub mod probe;
 pub mod report;
 pub mod sse;
 
 pub use checks::consistency_warnings;
 pub use client::{
     build_user_content, build_user_message, stderr_progress, AnalysisResult, Config, Error,
-    FundamentalsClient, ProgressSink, Usage,
+    FundamentalsClient, ProbeOutcome, ProgressSink, Usage,
 };
 pub use models::{
     AnalysisRequest, AnalysisResponse, Category, Frequency, ImageAttachment, MeasureId, Period,
