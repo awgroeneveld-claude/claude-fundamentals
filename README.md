@@ -61,7 +61,8 @@ validation. The Python CLI has `--yaml` for that.
 * `frequency` defaults to `both`, which is the framework's approach: annual series for every measure
   over the whole period (5-10 years), plus quarterly points for the most recent `recent_quarters`
   (default 8) on the core flow and balance measures (revenue, margins, net income, EPS, operating
-  and free cash flow, total and net debt, cash). Trend statistics are computed on the annual points;
+  and free cash flow, total and net debt, cash) and on trailing P/E (quarter-end price over
+  trailing four-quarter EPS). Trend statistics are computed on the annual points;
   the quarters feed the trend comment, inflection detection and the latest value. `annual` and
   `quarterly` give one kind only, over the whole period. The report charts annual and quarterly
   points separately so a quarter never sits on an annual axis.
