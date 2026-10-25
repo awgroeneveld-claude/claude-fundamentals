@@ -124,7 +124,7 @@ fn request_body_matches_python_reference_shape() {
     let defs = &body["output_config"]["format"]["schema"]["$defs"];
     assert!(
         defs.get("MeasureId")
-            .map_or(true, |d| d.get("enum").is_none()),
+            .is_none_or(|d| d.get("enum").is_none()),
         "MeasureId must not be an enum in the wire schema"
     );
     assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
