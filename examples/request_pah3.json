@@ -1,0 +1,15 @@
+{
+  "symbol": "PAH3",
+  "exchange": "XETRA",
+  "company_name": "Porsche Automobil Holding SE",
+  "reporting_currency": "EUR",
+  "period": { "start": "2017-01-01", "end": "2025-12-31" },
+  "frequency": "both",
+  "recent_quarters": 8,
+  "categories": ["valuation", "profitability", "non_operating", "leverage", "cash_flow_quality", "growth", "ownership", "context"],
+  "peer_symbols": ["VOW3", "P911", "EXO", "HAL"],
+  "sector_hint": "listed investment holding company whose assets are stakes in automotive OEMs",
+  "allow_web_research": true,
+  "signal_history": true,
+  "notes": "PAH3 is the non-voting preference share of Porsche Automobil Holding SE (Porsche SE), the holding company controlled by the Porsche and Piech families; it is not Porsche AG (P911). Its main assets are the majority of Volkswagen AG ordinary shares and a 25% plus one ordinary-share stake in Porsche AG, both accounted for at equity, so consolidated revenue is negligible and the income statement is dominated by the share of results of equity-accounted investments plus impairments on those stakes. Apply the framework accordingly: treat the equity-accounted result (before impairments) as the core operating result and report impairments of investments as one-time, non-operating items; margins on revenue are not meaningful and may be null with the reason stated; use net income, EPS, dividend per preference share and the group's own net debt at holding level (the acquisition financing taken for the Porsche AG stake in 2022 and its refinancing) for leverage, with interest coverage measured against dividend income received from Volkswagen and Porsche AG; cash flow quality is about dividends received versus interest paid and dividends paid. Valuation: besides P/E and P/B, the decisive measure is the discount of PAH3's market capitalisation to the market value of its listed stakes net of holding debt (the NAV discount); report it in context and in the valuation pillar rationale, with the date and prices used, because the catalogue has no measure id for it. Ownership: ordinary shares are held by the families (unlisted); preference shares are the free float. Fiscal year ends 31 December; amounts in EUR millions. Related: Volkswagen's own fundamentals drive most of the equity result; summarise them only as far as needed to explain the trend."
+}

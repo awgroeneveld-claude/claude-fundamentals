@@ -36,6 +36,7 @@ fn example_requests_parse() {
         "request_supplied_data.json",
         "request_vow3.json",
         "request_volcar_b.json",
+        "request_pah3.json",
     ] {
         let text = std::fs::read_to_string(root().join("examples").join(name)).unwrap();
         let req: AnalysisRequest = serde_json::from_str(&text).unwrap();

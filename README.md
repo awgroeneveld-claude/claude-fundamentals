@@ -260,7 +260,12 @@ eight categories, annual plus eight quarters, signal history, a EUR base-currenc
 on the 2021 listing (no valuation before it), the Polestar equity-accounted results and impairments
 under non-operating items, and Geely's majority ownership. `examples/request_vow3.json` does the
 same for Volkswagen preference shares, with notes on the ordinary/preference split and the
-captive financial-services debt.
+captive financial-services debt. `examples/request_pah3.json` covers Porsche Automobil Holding SE (XETRA: PAH3), a
+holding company whose assets are equity-accounted stakes in Volkswagen and Porsche AG: the notes
+reinterpret the framework (equity-accounted result as the core result, impairments as one-time
+items, margins not meaningful, leverage and cash-flow quality at holding level, and the NAV
+discount as the decisive valuation measure, reported in context since the catalogue has no id
+for it).
 
 ### Markdown report
 
@@ -447,7 +452,7 @@ schema/analysis_request.schema.json     request contract
 schema/analysis_response.schema.json    response contract exactly as sent to the API
 fundamentals_client/                    Python reference (models.py = schema source of truth, client.py, __main__.py CLI)
 rust/                                   Rust crate: models.rs, sse.rs, client.rs, checks.rs, report.rs, chart.rs, main.rs CLI, tests/offline.rs
-examples/                               six requests (ASML, AAPL quarterly, supplied data, screenshots, Volkswagen, Volvo Cars) + make_sample_response.py + sample_response.json
+examples/                               seven requests (ASML, AAPL quarterly, supplied data, screenshots, Volkswagen, Volvo Cars, Porsche SE) + make_sample_response.py + sample_response.json
 tests/                                  Python offline tests
 ```
 
