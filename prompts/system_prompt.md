@@ -67,6 +67,7 @@ Penalties (apply cumulatively, floor at 1 for a non-null value):
 Aggregation rules:
 - A derived measure's reliability is at most the minimum reliability of its inputs, minus the derivation penalty from the band table.
 - A `trend.reliability_pct` is at most the median reliability of the series points it uses, and at most 50 when the series has fewer than three points.
+- This cap counts the measure's own `series` points, not the points behind a statistic: a measure that is itself one summary figure (a CAGR, a coefficient of variation, a percentile, a single-date score such as Piotroski F) usually has one or two points, so its `trend.reliability_pct` is at most 50 however good the underlying data is.
 - A pillar's reliability is at most the mean reliability of its `key_measures`. A pillar whose inputs were not requested gets `assessment: not_assessed`, `reliability_pct: 0`, and is excluded from the aggregations below.
 - `signal.reliability_pct` is at most the mean of the assessed pillars' reliabilities and at most 20 points above the lowest assessed pillar reliability.
 - `overall_reliability_pct` is the value-count-weighted mean of all measure reliabilities.
