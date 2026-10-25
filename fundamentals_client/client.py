@@ -98,7 +98,7 @@ def load_system_prompt(path: Path = PROMPT_PATH) -> str:
 
 def build_user_message(req: AnalysisRequest, today: str) -> str:
     """The volatile text part of the prompt. Keep the system prompt untouched so it stays cached."""
-    payload = req.model_dump(mode="json", exclude_none=True, exclude={"images"})
+    payload = req.model_dump(mode="json", exclude_none=True, exclude={"images", "previous_response"})
     lines = [
         f"Analysis date: {today}",
         "Analyse the following request using the framework and return the structured result.",
@@ -107,6 +107,15 @@ def build_user_message(req: AnalysisRequest, today: str) -> str:
         json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False),
         "```",
     ]
+    if req.previous_response is not None:
+        prev_date = req.previous_response.get("analysis_date", "unknown date")
+        lines.append("")
+        lines.append(f"This is an incremental update. The previous analysis (as of {prev_date}) follows; apply the "
+                     "incremental-update rules.")
+        lines.append("")
+        lines.append("```json")
+        lines.append(json.dumps(req.previous_response, indent=1, sort_keys=True, ensure_ascii=False))
+        lines.append("```")
     if req.images:
         lines.append("")
         lines.append(f"{len(req.images)} screenshot(s) are attached before this text, in this order:")
@@ -376,7 +385,9 @@ def consistency_warnings(r: AnalysisResponse) -> list[str]:
     for m in r.measures:
         if m.unit.value in ("currency", "per_share") and m.scale.value == "not_applicable":
             w.append(f"{m.measure_id.value}: currency amount without a scale")
-        if m.unit.value not in ("currency", "per_share") and (m.currency or m.scale.value != "not_applicable"):
+        if m.unit.value not in ("currency", "per_share") and (
+            m.currency or (m.scale.value != "not_applicable" and m.unit.value != "count")
+        ):
             w.append(f"{m.measure_id.value}: {m.unit.value} measure carries currency/scale")
 
     # Base-currency conversion is optional extra value; when requested it must be complete and consistent.

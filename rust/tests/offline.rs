@@ -461,3 +461,95 @@ fn signal_history_is_checked_and_charted() {
     );
     assert!(w.iter().any(|x| x.contains("not chronological")), "{w:?}");
 }
+
+#[test]
+fn previous_response_goes_in_its_own_block() {
+    let prev: Value = serde_json::from_str(
+        &std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap(),
+    )
+    .unwrap();
+    let text = std::fs::read_to_string(root().join("examples/request_supplied_data.json")).unwrap();
+    let mut req: AnalysisRequest = serde_json::from_str(&text).unwrap();
+    req.previous_response = Some(prev);
+    let msg = fundamentals_client::build_user_message(&req, "2026-10-25");
+    assert!(msg.contains("incremental update") && msg.contains("as of 2026-10-25"));
+    assert_eq!(msg.matches("```json").count(), 2);
+    assert!(!msg
+        .split("incremental update")
+        .next()
+        .unwrap()
+        .contains("\"previous_response\""));
+}
+
+#[test]
+fn incremental_merge_adds_without_rewriting() {
+    use fundamentals_client::merge_incremental;
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let prev: AnalysisResponse = serde_json::from_str(&text).unwrap();
+    let mut d: Value = serde_json::from_str(&text).unwrap();
+    d["analysis_date"] = json!("2027-03-01");
+    for m in d["measures"].as_array_mut().unwrap() {
+        if m["measure_id"] == "revenue" {
+            m["series"] = json!([
+                {"period_end": "2025-12-31", "period_type": "FY", "value": 2230.0, "value_base": null, "reliability_pct": 100, "method": "reported", "source_ids": ["S2"]},
+                {"period_end": "2024-12-31", "period_type": "FY", "value": 2155.0, "value_base": null, "reliability_pct": 100, "method": "reported", "source_ids": ["S2"]}
+            ]);
+            m["latest"] = m["series"][0].clone();
+        } else {
+            m["series"] = json!([]);
+        }
+    }
+    d["sources"] = json!([{"id": "S2", "type": "primary_filing", "title": "FY2025 annual report", "url": "", "period_covered": "FY2025", "retrieved_at": "2027-03-01"}]);
+    d["signal_history"] = json!([{"period_end": "2025-12-31", "period_type": "FY", "category": "hold", "conviction_pct": 50, "reliability_pct": 80,
+        "valuation_assessed": false, "pillar_scores": {"valuation": 0, "profitability_stability": 50, "debt_health": 45, "earnings_quality": 55, "trends": 50},
+        "decisive_factor": "Recovery in cash conversion.", "source_ids": ["S2"]}]);
+    let delta: AnalysisResponse = serde_json::from_value(d).unwrap();
+    let merged = merge_incremental(&prev, &delta, Some(8));
+    let rev = merged
+        .measures
+        .iter()
+        .find(|m| format!("{:?}", m.measure_id) == "Revenue")
+        .unwrap();
+    let ends: Vec<&str> = rev.series.iter().map(|p| p.period_end.as_str()).collect();
+    assert_eq!(
+        ends,
+        [
+            "2021-12-31",
+            "2022-12-31",
+            "2023-12-31",
+            "2024-12-31",
+            "2025-12-31"
+        ]
+    );
+    assert_eq!(
+        rev.series
+            .iter()
+            .find(|p| p.period_end == "2024-12-31")
+            .unwrap()
+            .value,
+        Some(2155.0)
+    );
+    assert_eq!(
+        rev.series
+            .iter()
+            .find(|p| p.period_end == "2023-12-31")
+            .unwrap()
+            .value,
+        Some(2104.0)
+    );
+    let om = merged
+        .measures
+        .iter()
+        .find(|m| format!("{:?}", m.measure_id) == "OperatingMargin")
+        .unwrap();
+    assert_eq!(om.series.len(), 4);
+    let ids: Vec<&str> = merged.sources.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, ["S1", "S2"]);
+    assert_eq!(merged.signal_history.len(), 5);
+    assert_eq!(merged.analysis_date, "2027-03-01");
+    assert!(
+        consistency_warnings(&merged).is_empty(),
+        "{:?}",
+        consistency_warnings(&merged)
+    );
+}

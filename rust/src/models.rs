@@ -291,6 +291,11 @@ pub struct AnalysisRequest {
     pub allow_web_research: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplied_data: Option<Value>,
+    /// The AnalysisResponse from the previous run for this symbol. When present the run is
+    /// incremental: prior series kept (verified for restatements), only newer periods fetched,
+    /// point-in-time items refreshed, trends and signal recomputed, signal_history extended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_response: Option<Value>,
     /// Also evaluate the framework as of each fiscal year-end in the period (point-in-time).
     #[serde(default = "default_true")]
     pub signal_history: bool,
@@ -347,6 +352,7 @@ impl AnalysisRequest {
             sector_hint: None,
             allow_web_research: true,
             supplied_data: None,
+            previous_response: None,
             signal_history: true,
             images: vec![],
             notes: None,

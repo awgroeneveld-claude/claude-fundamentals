@@ -311,6 +311,12 @@ class AnalysisRequest(Strict):
         description="Raw financial-statement data from your own provider (any JSON shape; "
         "describe units/periods inside it). When present, it is the preferred source.",
     )
+    previous_response: dict[str, Any] | None = Field(
+        default=None,
+        description="The AnalysisResponse from the previous run for this symbol. When present the run is "
+        "incremental: prior series points are kept (verified for restatements), only newer periods are "
+        "fetched, point-in-time items refreshed, trends and signal recomputed, signal_history extended.",
+    )
     signal_history: bool = Field(
         default=True,
         description="Also evaluate the framework as of each fiscal year-end in the period (point-in-time, "

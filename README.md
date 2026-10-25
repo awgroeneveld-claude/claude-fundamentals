@@ -362,7 +362,56 @@ From code: `FundamentalsClient().analyze(AnalysisRequest(...))` returns an `Anal
 `python -m fundamentals_client schema`, mirror the change in `rust/src/models.rs`, and run both
 test suites (`tests/test_models.py` and `rust/tests/offline.rs` both validate the shared examples).
 
-## 6. API key handling
+## 6. Quarterly update workflow
+
+The intended operation is one run per symbol per quarter, after the new interim or annual report
+is out, **adding to the stored document rather than regenerating it**. Two modes:
+
+* **Full run** (no previous result): everything is researched from scratch. For the first analysis
+  of a symbol, or when you change the prompt and want a clean baseline.
+* **Incremental run** (`--previous last.json` on the CLI, `previous_response` in the request): the
+  model receives the stored analysis and returns a **delta**: only series points for periods that
+  end after the ones it already has, plus explicitly restated points (latest fiscal year and two
+  quarters are re-verified against the newest filing), refreshed point-in-time items (price,
+  multiples, ownership), and complete recomputed trends, pillars, signal and new `signal_history`
+  points. The client then merges the delta into the stored document deterministically
+  (`merge_incremental` in both languages): points are keyed by period end and type, a restated
+  point replaces the old one, everything else is untouched, the quarterly window is trimmed to
+  `recent_quarters`, sources and signal-history points are appended, and the verdict blocks are
+  replaced. `signal.rationale` states what changed since last time. If nothing new has been
+  published the delta says so in `data_gaps` and the merged document only gains fresh
+  point-in-time values. Output tokens drop to a fraction of a full run, and history can only
+  change through a named restatement.
+
+```bash
+# first run
+./target/release/fundamentals analyze req.json --out store/VOLCAR_B/2026-10-25.json --report
+# next quarter: adds to the previous document
+./target/release/fundamentals analyze req.json --previous store/VOLCAR_B/2026-10-25.json \
+    --out store/VOLCAR_B/2027-02-10.json --report
+```
+
+In your app:
+
+```rust
+let prev: Option<AnalysisResponse> = store.latest(symbol)?;
+let mut req = AnalysisRequest::new(symbol, "2018-01-01", today);
+req.previous_response = prev.as_ref().map(|p| serde_json::to_value(p).unwrap());
+let result = client.analyze(&req).await?;                       // result.response is the delta
+let doc = match &prev {
+    Some(p) => merge_incremental(p, &result.response, Some(req.recent_quarters)),
+    None => result.response.clone(),
+};
+store.save(symbol, &doc)?;                                      // keyed by symbol + analysis_date
+```
+
+Scheduling: reporting dates are published in each company's IR calendar, so run a symbol a day or
+two after each one, or run the whole watchlist monthly and let the incremental mode report "no new
+period" cheaply. Keep every merged document. The sequence of as-run `signal` values is your real
+track record, distinct from the retrospective `signal_history`, and the per-run `reliability_pct`
+values are what you later compare against verified figures to calibrate the rubric.
+
+## 7. API key handling
 
 * Create the key in the Anthropic Console in a **dedicated workspace** for this app, with a monthly
   spend limit. Keys are shown once; store them in your secret manager (Vault, AWS Secrets Manager,
@@ -380,7 +429,7 @@ test suites (`tests/test_models.py` and `rust/tests/offline.rs` both validate th
   Don't paste the key into chat. If you prefer to keep the key off the cloud environment entirely,
   run the trial on your own machine from this branch instead.
 
-## 7. Repository layout
+## 8. Repository layout
 
 ```
 docs/investment_analysis_framework.md   the framework this is built on (unchanged)
@@ -393,7 +442,7 @@ examples/                               six requests (ASML, AAPL quarterly, supp
 tests/                                  Python offline tests
 ```
 
-## 8. Status and open items
+## 9. Status and open items
 
 Verified live: the Rust CLI completed an ASML web-research run and produced a 40 KB response that
 parsed through the strict types, with the schema in the prompt rather than API-enforced. Verified

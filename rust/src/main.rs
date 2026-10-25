@@ -48,6 +48,9 @@ enum Cmd {
         /// Suppress the progress log on stderr
         #[arg(long)]
         quiet: bool,
+        /// Previous result JSON for this symbol: run incrementally (delta) and merge into it
+        #[arg(long)]
+        previous: Option<PathBuf>,
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
@@ -173,11 +176,23 @@ async fn main() -> anyhow::Result<()> {
             enforce_schema,
             report,
             quiet,
+            previous,
         } => {
             let text = std::fs::read_to_string(&request)
                 .with_context(|| format!("reading {}", request.display()))?;
-            let req: AnalysisRequest =
+            let mut req: AnalysisRequest =
                 serde_json::from_str(&text).context("request does not match AnalysisRequest")?;
+            let previous_resp: Option<AnalysisResponse> = match &previous {
+                Some(p) => {
+                    let t = std::fs::read_to_string(p)
+                        .with_context(|| format!("reading {}", p.display()))?;
+                    let r: AnalysisResponse = serde_json::from_str(&t)
+                        .context("previous result does not match AnalysisResponse")?;
+                    req.previous_response = Some(serde_json::to_value(&r)?);
+                    Some(r)
+                }
+                None => None,
+            };
             let mut cfg = Config::from_env()?;
             cfg.model = model;
             cfg.effort = effort;
@@ -198,7 +213,7 @@ async fn main() -> anyhow::Result<()> {
                 .ok()
                 .and_then(|p| p.parent().map(|d| d.to_path_buf()));
             let today = fundamentals_client::client::today_iso();
-            let result = match client
+            let mut result = match client
                 .analyze_dated(&req, &today, base_dir.as_deref())
                 .await
             {
@@ -217,6 +232,16 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => return Err(e.into()),
             };
 
+            if let Some(prev) = &previous_resp {
+                let merged = fundamentals_client::merge_incremental(
+                    prev,
+                    &result.response,
+                    Some(req.recent_quarters),
+                );
+                result.warnings = consistency_warnings(&merged);
+                result.raw_json = serde_json::to_string_pretty(&merged)?;
+                result.response = merged;
+            }
             match &out {
                 Some(p) => {
                     if let Some(dir) = p.parent() {

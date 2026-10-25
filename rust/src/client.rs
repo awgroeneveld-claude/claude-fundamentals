@@ -186,11 +186,24 @@ pub fn web_tools() -> Vec<Value> {
 pub fn build_user_message(req: &AnalysisRequest, today: &str) -> String {
     // Images are sent as separate blocks, never inside the JSON payload.
     let mut payload = serde_json::to_value(req).expect("request serialises");
-    payload.as_object_mut().map(|o| o.remove("images"));
+    if let Some(o) = payload.as_object_mut() {
+        o.remove("images");
+        o.remove("previous_response");
+    }
     let payload = serde_json::to_string_pretty(&payload).expect("request serialises");
     let mut s = format!(
         "Analysis date: {today}\nAnalyse the following request using the framework and return the structured result.\n\n```json\n{payload}\n```"
     );
+    if let Some(prev) = &req.previous_response {
+        let date = prev
+            .get("analysis_date")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown date");
+        s.push_str(&format!(
+            "\n\nThis is an incremental update. The previous analysis (as of {date}) follows; apply the incremental-update rules.\n\n```json\n{}\n```",
+            serde_json::to_string(prev).expect("previous response serialises")
+        ));
+    }
     if !req.images.is_empty() {
         s.push_str(&format!(
             "\n\n{} screenshot(s) are attached before this text, in this order:",

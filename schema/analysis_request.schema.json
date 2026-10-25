@@ -240,6 +240,20 @@
       "description": "Raw financial-statement data from your own provider (any JSON shape; describe units/periods inside it). When present, it is the preferred source.",
       "title": "Supplied Data"
     },
+    "previous_response": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The AnalysisResponse from the previous run for this symbol. When present the run is incremental: prior series points are kept (verified for restatements), only newer periods are fetched, point-in-time items refreshed, trends and signal recomputed, signal_history extended.",
+      "title": "Previous Response"
+    },
     "signal_history": {
       "default": true,
       "description": "Also evaluate the framework as of each fiscal year-end in the period (point-in-time, no look-ahead), producing a buy/hold/sell series.",

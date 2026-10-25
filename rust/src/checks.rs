@@ -147,7 +147,10 @@ pub fn consistency_warnings(r: &AnalysisResponse) -> Vec<String> {
                 m.measure_id
             ));
         }
-        if !is_money(m.unit) && (!m.currency.is_empty() || m.scale != Scale::NotApplicable) {
+        if !is_money(m.unit)
+            && (!m.currency.is_empty()
+                || (m.scale != Scale::NotApplicable && m.unit != Unit::Count))
+        {
             w.push(format!(
                 "{:?}: {:?} measure carries currency/scale",
                 m.measure_id, m.unit

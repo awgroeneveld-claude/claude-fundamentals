@@ -136,3 +136,49 @@ def test_signal_history_checks():
     w = consistency_warnings(AnalysisResponse.model_validate(data))
     assert any("without valuation assessed" in x for x in w), w
     assert any("not chronological" in x for x in w), w
+
+
+def test_previous_response_goes_in_its_own_block():
+    from fundamentals_client.client import build_user_message
+
+    prev = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    req = AnalysisRequest.model_validate_json((ROOT / "examples" / "request_supplied_data.json").read_text())
+    req.previous_response = prev
+    msg = build_user_message(req, "2026-10-25")
+    assert "incremental update" in msg and "as of 2026-10-25" in msg
+    assert msg.count("```json") == 2
+    assert '"previous_response"' not in msg.split("incremental update")[0]
+
+
+def test_incremental_merge_adds_without_rewriting():
+    from fundamentals_client import merge_incremental
+
+    prev = AnalysisResponse.model_validate_json((ROOT / "examples" / "sample_response.json").read_text())
+    d = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    d["analysis_date"] = "2027-03-01"
+    for m in d["measures"]:
+        if m["measure_id"] == "revenue":
+            m["series"] = [{"period_end": "2025-12-31", "period_type": "FY", "value": 2230.0, "value_base": None,
+                            "reliability_pct": 100, "method": "reported", "source_ids": ["S2"]},
+                           {"period_end": "2024-12-31", "period_type": "FY", "value": 2155.0, "value_base": None,
+                            "reliability_pct": 100, "method": "reported", "source_ids": ["S2"]}]  # restated
+            m["latest"] = m["series"][0]
+        else:
+            m["series"] = []
+    d["sources"] = [{"id": "S2", "type": "primary_filing", "title": "FY2025 annual report", "url": "", "period_covered": "FY2025", "retrieved_at": "2027-03-01"}]
+    d["signal_history"] = [{"period_end": "2025-12-31", "period_type": "FY", "category": "hold", "conviction_pct": 50, "reliability_pct": 80,
+                            "valuation_assessed": False, "pillar_scores": {"valuation": 0, "profitability_stability": 50, "debt_health": 45, "earnings_quality": 55, "trends": 50},
+                            "decisive_factor": "Recovery in cash conversion.", "source_ids": ["S2"]}]
+    delta = AnalysisResponse.model_validate(d)
+    merged = merge_incremental(prev, delta, recent_quarters=8)
+    rev = next(m for m in merged.measures if m.measure_id.value == "revenue")
+    ends = [p.period_end for p in rev.series]
+    assert ends == ["2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"]
+    assert next(p for p in rev.series if p.period_end == "2024-12-31").value == 2155.0  # restated
+    assert next(p for p in rev.series if p.period_end == "2023-12-31").value == 2104.0  # untouched
+    other = next(m for m in merged.measures if m.measure_id.value == "operating_margin")
+    assert len(other.series) == 4  # empty delta series keeps history
+    assert [s.id for s in merged.sources] == ["S1", "S2"]
+    assert [sp.period_end for sp in merged.signal_history][-2:] == ["2024-12-31", "2025-12-31"]
+    assert merged.analysis_date == "2027-03-01"
+    assert consistency_warnings(merged) == []

@@ -50,9 +50,13 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_analyze(args: argparse.Namespace) -> int:
-    from .client import AnalysisIncomplete, AnalysisRefused, FundamentalsClient
+    from .client import AnalysisIncomplete, AnalysisRefused, FundamentalsClient, consistency_warnings
 
     req = AnalysisRequest.model_validate_json(Path(args.request).read_text(encoding="utf-8"))
+    previous = None
+    if args.previous:
+        previous = AnalysisResponse.model_validate_json(Path(args.previous).read_text(encoding="utf-8"))
+        req.previous_response = previous.model_dump(mode="json")
     progress = None if args.quiet else (lambda line: print(line, file=sys.stderr, flush=True))
     if progress:
         progress(f"starting analysis of {req.symbol} (effort {args.effort}, web research {req.allow_web_research})")
@@ -72,6 +76,13 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         print(f"incomplete: {e}", file=sys.stderr)
         return 4
 
+    if previous is not None:
+        from .merge import merge_incremental
+
+        merged = merge_incremental(previous, result.response, recent_quarters=req.recent_quarters)
+        result.response = merged
+        result.raw_json = merged.model_dump_json(indent=2)
+        result.warnings = consistency_warnings(merged)
     out = Path(args.out) if args.out else None
     if out:
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="also send the schema as output_config.format (API-side grammar); off by default, see README",
     )
+    a.add_argument("--previous", help="previous result JSON for this symbol: run incrementally and merge")
     a.add_argument("--quiet", action="store_true", help="suppress the progress log on stderr")
     a.set_defaults(fn=cmd_analyze)
 

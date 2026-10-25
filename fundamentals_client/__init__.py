@@ -6,6 +6,7 @@ from .client import (
     consistency_warnings,
     load_system_prompt,
 )
+from .merge import merge_incremental
 from .models import (
     AnalysisRequest,
     AnalysisResponse,
@@ -32,4 +33,5 @@ __all__ = [
     "Signal",
     "consistency_warnings",
     "load_system_prompt",
+    "merge_incremental",
 ]
