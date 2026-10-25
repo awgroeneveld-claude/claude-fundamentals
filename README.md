@@ -42,7 +42,8 @@ validation. The Python CLI has `--yaml` for that.
   "exchange": "Euronext Amsterdam",
   "reporting_currency": "EUR",
   "period": { "start": "2016-01-01", "end": "2025-12-31" },
-  "frequency": "annual",
+  "frequency": "both",
+  "recent_quarters": 8,
   "categories": ["valuation", "profitability", "leverage", "cash_flow_quality", "growth"],
   "measures": null,
   "peer_symbols": ["AMAT", "LRCX", "KLAC"],
@@ -53,6 +54,13 @@ validation. The Python CLI has `--yaml` for that.
 }
 ```
 
+* `frequency` defaults to `both`, which is the framework's approach: annual series for every measure
+  over the whole period (5-10 years), plus quarterly points for the most recent `recent_quarters`
+  (default 8) on the core flow and balance measures (revenue, margins, net income, EPS, operating
+  and free cash flow, total and net debt, cash). Trend statistics are computed on the annual points;
+  the quarters feed the trend comment, inflection detection and the latest value. `annual` and
+  `quarterly` give one kind only, over the whole period. The report charts annual and quarterly
+  points separately so a quarter never sits on an annual axis.
 * `reporting_currency` is a hint; the statements' own currency wins. `base_currency` (optional) asks
   for an extra converted view, see "Currencies" below.
 * `categories` selects framework sections 1.1 to 1.8; `measures` optionally whitelists individual

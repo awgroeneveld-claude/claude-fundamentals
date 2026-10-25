@@ -3,10 +3,28 @@
   "exchange": "XETRA",
   "company_name": "Volkswagen AG",
   "reporting_currency": "EUR",
-  "period": { "start": "2017-01-01", "end": "2025-12-31" },
-  "frequency": "annual",
-  "categories": ["valuation", "profitability", "non_operating", "leverage", "cash_flow_quality", "growth", "ownership", "context"],
-  "peer_symbols": ["BMW", "MBG", "STLAM", "TM"],
+  "period": {
+    "start": "2017-01-01",
+    "end": "2025-12-31"
+  },
+  "frequency": "both",
+  "recent_quarters": 8,
+  "categories": [
+    "valuation",
+    "profitability",
+    "non_operating",
+    "leverage",
+    "cash_flow_quality",
+    "growth",
+    "ownership",
+    "context"
+  ],
+  "peer_symbols": [
+    "BMW",
+    "MBG",
+    "STLAM",
+    "TM"
+  ],
   "sector_hint": "automotive OEM with a captive financial-services arm",
   "allow_web_research": true,
   "notes": "VOW3 is the preference share (no voting rights); VOW is the ordinary share. Use the VOW3 price and the preference-share dividend for per-share and yield figures. Volkswagen Financial Services carries large customer-financing debt: report leverage both as published (consolidated) and, where the annual report splits it, for the Automotive division; apply the sector adjustment in the signal and explain it. Ownership: Porsche Automobil Holding SE, State of Lower Saxony and Qatar Investment Authority hold most ordinary shares; preference shares are largely free float. Fiscal year ends 31 December; amounts in EUR millions."

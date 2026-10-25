@@ -272,8 +272,13 @@ pub struct AnalysisRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_currency: Option<String>,
     pub period: Period,
+    /// annual: fiscal years (+TTM); quarterly: fiscal quarters; both (default): annual series for
+    /// every measure over the full period plus quarterly series for the core flow and balance
+    /// measures over the most recent `recent_quarters` quarters.
     #[serde(default = "default_frequency")]
     pub frequency: Frequency,
+    #[serde(default = "default_recent_quarters")]
+    pub recent_quarters: u32,
     #[serde(default = "all_categories")]
     pub categories: Vec<Category>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -293,7 +298,10 @@ pub struct AnalysisRequest {
 }
 
 fn default_frequency() -> Frequency {
-    Frequency::Annual
+    Frequency::Both
+}
+fn default_recent_quarters() -> u32 {
+    8
 }
 fn default_true() -> bool {
     true
@@ -328,7 +336,8 @@ impl AnalysisRequest {
                 start: start.into(),
                 end: end.into(),
             },
-            frequency: Frequency::Annual,
+            frequency: Frequency::Both,
+            recent_quarters: 8,
             categories: all_categories(),
             measures: None,
             peer_symbols: vec![],

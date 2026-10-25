@@ -165,7 +165,16 @@
     },
     "frequency": {
       "$ref": "#/$defs/Frequency",
-      "default": "annual"
+      "default": "both",
+      "description": "annual: fiscal years (+TTM); quarterly: fiscal quarters; both (default, the framework's approach): annual series for every measure over the full period plus quarterly series for the core flow and balance measures over the most recent `recent_quarters` quarters."
+    },
+    "recent_quarters": {
+      "default": 8,
+      "description": "Quarters covered by the quarterly series when frequency is both",
+      "maximum": 40,
+      "minimum": 1,
+      "title": "Recent Quarters",
+      "type": "integer"
     },
     "categories": {
       "description": "Subset of the framework's data categories to analyse.",

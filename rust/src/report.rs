@@ -196,18 +196,23 @@ fn chart_groups<'a>(measures: &[&'a Measure]) -> Vec<(String, Vec<&'a Measure>)>
     out
 }
 
-fn spec_for(title: &str, group: &[&Measure]) -> ChartSpec {
+/// Which chart a data point belongs to: annual-like (FY, TTM, FWD, POINT) or quarterly.
+fn is_quarterly(p: &DataPoint) -> bool {
+    p.period_type == PeriodType::Q
+}
+
+fn spec_for(title: &str, group: &[&Measure], quarterly: bool) -> Option<ChartSpec> {
     // Union of period labels across the group, in chronological order of period_end.
     let mut periods: Vec<(String, String)> = Vec::new(); // (period_end, label)
     for m in group {
-        for p in &m.series {
+        for p in m.series.iter().filter(|p| is_quarterly(p) == quarterly) {
             if !periods.iter().any(|(e, _)| e == &p.period_end) {
                 periods.push((p.period_end.clone(), period_label(p)));
             }
         }
     }
     periods.sort();
-    let series = group
+    let series: Vec<Series> = group
         .iter()
         .map(|m| Series {
             name: m.label.clone(),
@@ -216,23 +221,32 @@ fn spec_for(title: &str, group: &[&Measure]) -> ChartSpec {
                 .map(|(e, _)| {
                     m.series
                         .iter()
-                        .find(|p| &p.period_end == e)
+                        .find(|p| &p.period_end == e && is_quarterly(p) == quarterly)
                         .and_then(|p| p.value)
                 })
                 .collect(),
         })
+        .filter(|s| s.points.iter().flatten().count() >= 2)
         .collect();
+    if series.is_empty() {
+        return None;
+    }
     let unit = unit_label(group[0]);
-    ChartSpec {
-        title: if group.len() == 1 {
-            group[0].label.clone()
+    let base = if group.len() == 1 {
+        group[0].label.clone()
+    } else {
+        title.to_string()
+    };
+    Some(ChartSpec {
+        title: if quarterly {
+            format!("{base}, quarterly")
         } else {
-            title.to_string()
+            base
         },
         unit_label: unit,
         categories: periods.into_iter().map(|(_, l)| l).collect(),
         series,
-    }
+    })
 }
 
 fn slug(s: &str) -> String {
@@ -430,21 +444,25 @@ pub fn render(r: &AnalysisResponse, opts: &ReportOptions) -> Report {
         if opts.charts != ChartMode::None {
             for (title, group) in chart_groups(&ms) {
                 let title = format!("{} ({})", title_case(&snake(cat)), title);
-                let spec = spec_for(&title, &group);
-                match opts.charts {
-                    ChartMode::Svg => {
-                        let file = format!("{}.svg", slug(&spec.title));
-                        let _ = writeln!(
-                            md,
-                            "![{}]({}/{})\n",
-                            spec.title,
-                            opts.chart_dir.trim_end_matches('/'),
-                            file
-                        );
-                        charts.push((file, line_chart_svg(&spec)));
+                let specs = [false, true]
+                    .into_iter()
+                    .filter_map(|q| spec_for(&title, &group, q));
+                for spec in specs {
+                    match opts.charts {
+                        ChartMode::Svg => {
+                            let file = format!("{}.svg", slug(&spec.title));
+                            let _ = writeln!(
+                                md,
+                                "![{}]({}/{})\n",
+                                spec.title,
+                                opts.chart_dir.trim_end_matches('/'),
+                                file
+                            );
+                            charts.push((file, line_chart_svg(&spec)));
+                        }
+                        ChartMode::Mermaid => md.push_str(&mermaid_blocks(&spec)),
+                        ChartMode::None => {}
                     }
-                    ChartMode::Mermaid => md.push_str(&mermaid_blocks(&spec)),
-                    ChartMode::None => {}
                 }
             }
         }

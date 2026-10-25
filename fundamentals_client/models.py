@@ -284,7 +284,13 @@ class AnalysisRequest(Strict):
         "converted into this currency, and the response includes the fx rates used.",
     )
     period: Period
-    frequency: Frequency = Frequency.annual
+    frequency: Frequency = Field(
+        default=Frequency.both,
+        description="annual: fiscal years (+TTM); quarterly: fiscal quarters; both (default, the framework's "
+        "approach): annual series for every measure over the full period plus quarterly series for the core "
+        "flow and balance measures over the most recent `recent_quarters` quarters.",
+    )
+    recent_quarters: int = Field(default=8, ge=1, le=40, description="Quarters covered by the quarterly series when frequency is both")
     categories: list[Category] = Field(
         default_factory=lambda: [c for c in Category],
         description="Subset of the framework's data categories to analyse.",

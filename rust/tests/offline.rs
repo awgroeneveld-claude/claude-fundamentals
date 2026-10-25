@@ -384,3 +384,42 @@ fn probe_variants_are_valid_subsets() {
         .unwrap()
         .contains("\"enum\""));
 }
+
+#[test]
+fn quarterly_points_get_their_own_chart() {
+    use fundamentals_client::{render_report, ChartMode, ReportOptions};
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    // append four quarterly revenue points after the annual ones
+    let series = v["measures"][0]["series"].as_array_mut().unwrap();
+    for (d, val) in [
+        ("2024-03-31", 520.0),
+        ("2024-06-30", 530.0),
+        ("2024-09-30", 545.0),
+        ("2024-12-31", 555.0),
+    ] {
+        series.push(
+            json!({"period_end": d, "period_type": "Q", "value": val, "value_base": null,
+                           "reliability_pct": 100, "method": "reported", "source_ids": ["S1"]}),
+        );
+    }
+    let resp: AnalysisResponse = serde_json::from_value(v).unwrap();
+    let rep = render_report(
+        &resp,
+        &ReportOptions {
+            charts: ChartMode::Svg,
+            chart_dir: "c".into(),
+            warnings: vec![],
+        },
+    );
+    let names: Vec<&str> = rep.charts.iter().map(|(n, _)| n.as_str()).collect();
+    assert!(names.contains(&"revenue.svg"), "{names:?}");
+    assert!(names.contains(&"revenue-quarterly.svg"), "{names:?}");
+    let (_, q) = rep
+        .charts
+        .iter()
+        .find(|(n, _)| n == "revenue-quarterly.svg")
+        .unwrap();
+    assert_eq!(q.matches("<circle").count(), 4);
+    assert!(q.contains("Q 2024-12"));
+}
