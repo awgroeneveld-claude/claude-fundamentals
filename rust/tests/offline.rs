@@ -381,6 +381,13 @@ fn probe_variants_are_valid_subsets() {
         }
         check(&v.schema);
     }
+    let signal_only = vs.iter().find(|v| v.name == "signal-only").unwrap();
+    let defs = signal_only.schema["$defs"]
+        .as_object()
+        .map(|d| d.len())
+        .unwrap_or(0);
+    assert!(defs <= 2, "signal-only still carries {defs} $defs");
+    assert!(vs.iter().any(|v| v.name == "control-tiny"));
     let no_enums = vs.iter().find(|v| v.name == "no-enums").unwrap();
     assert!(!serde_json::to_string(&no_enums.schema)
         .unwrap()

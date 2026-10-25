@@ -101,15 +101,60 @@ fn count_props(v: &Value) -> usize {
     }
 }
 
+/// Drop `$defs` entries not reachable from the root (through other kept defs), so a cut-down
+/// variant really is small instead of carrying every definition of the full schema.
+fn prune_defs(schema: &mut Value) {
+    let Some(defs) = schema.get("$defs").and_then(Value::as_object).cloned() else {
+        return;
+    };
+    let refers = |hay: &Value, name: &str| {
+        serde_json::to_string(hay)
+            .unwrap_or_default()
+            .contains(&format!("\"#/$defs/{name}\""))
+    };
+    let mut root = schema.clone();
+    root.as_object_mut().unwrap().remove("$defs");
+    let mut reachable: Vec<String> = defs.keys().filter(|n| refers(&root, n)).cloned().collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for n in defs.keys() {
+            if !reachable.contains(n) && reachable.iter().any(|r| refers(&defs[r], n)) {
+                reachable.push(n.clone());
+                changed = true;
+            }
+        }
+    }
+    let pruned: Map<String, Value> = defs
+        .into_iter()
+        .filter(|(n, _)| reachable.contains(n))
+        .collect();
+    if pruned.is_empty() {
+        schema.as_object_mut().unwrap().remove("$defs");
+    } else {
+        schema["$defs"] = Value::Object(pruned);
+    }
+}
+
 pub fn variants(full: &Value) -> Vec<Variant> {
     let mut out = Vec::new();
-    let mut push = |name: &'static str, describe: &'static str, schema: Value| {
+    let mut push = |name: &'static str, describe: &'static str, mut schema: Value| {
+        prune_defs(&mut schema);
         out.push(Variant {
             name,
             describe,
             schema,
         })
     };
+
+    push(
+        "control-tiny",
+        "5 plain fields, no $defs: proves the endpoint accepts some schema",
+        json!({"type": "object", "additionalProperties": false,
+               "properties": {"symbol": {"type": "string"}, "category": {"type": "string"}, "conviction_pct": {"type": "integer"},
+                              "rationale": {"type": "string"}, "flags": {"type": "array", "items": {"type": "string"}}},
+               "required": ["symbol", "category", "conviction_pct", "rationale", "flags"]}),
+    );
 
     push("full", "the schema as shipped", full.clone());
 
