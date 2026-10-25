@@ -324,3 +324,23 @@ fn report_renders_sample_with_charts() {
     );
     assert!(mermaid.charts.is_empty() && mermaid.markdown.contains("xychart-beta"));
 }
+
+#[test]
+fn result_files_from_before_currency_fields_still_load() {
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    let obj = v.as_object_mut().unwrap();
+    obj.remove("currency_notes");
+    obj.remove("fx");
+    for m in v["measures"].as_array_mut().unwrap() {
+        m["latest"].as_object_mut().unwrap().remove("value_base");
+        for p in m["series"].as_array_mut().unwrap() {
+            p.as_object_mut().unwrap().remove("value_base");
+        }
+    }
+    let resp: AnalysisResponse = serde_json::from_value(v).unwrap();
+    assert!(resp.fx.base_currency.is_empty() && resp.currency_notes.is_empty());
+    let rep =
+        fundamentals_client::render_report(&resp, &fundamentals_client::ReportOptions::default());
+    assert!(rep.markdown.contains("## Currency"));
+}

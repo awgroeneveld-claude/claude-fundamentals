@@ -367,6 +367,8 @@ pub struct DataPoint {
     pub value: Option<f64>,
     /// Converted into the request's base currency (flows at average rate, stocks at closing rate,
     /// point-in-time at spot); None when no base currency, value is None, or unit is not money.
+    /// Defaults to None when absent, so result files from before this field still load.
+    #[serde(default)]
     pub value_base: Option<f64>,
     pub reliability_pct: u8,
     pub method: Method,
@@ -453,7 +455,7 @@ pub struct FxRate {
     pub reliability_pct: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Fx {
     pub reporting_currency: String,
@@ -533,7 +535,11 @@ pub struct AnalysisResponse {
     pub trend_summary: TrendSummary,
     pub signal: SignalBlock,
     /// Reporting currency, listing currency and the FX rate used for price-side conversion, or "no conversion".
+    /// Defaults to empty when absent (result files from before this field).
+    #[serde(default)]
     pub currency_notes: String,
+    /// Defaults to an empty block when absent (result files from before this field).
+    #[serde(default)]
     pub fx: Fx,
     pub sector_adjustments: Vec<String>,
     pub data_gaps: Vec<DataGap>,

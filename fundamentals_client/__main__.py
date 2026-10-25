@@ -33,8 +33,14 @@ def cmd_schema(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     from .client import consistency_warnings
 
-    data = Path(args.file).read_text(encoding="utf-8")
-    resp = AnalysisResponse.model_validate_json(data)
+    data = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    # Result files from before the currency fields: fill the defaults so they still validate.
+    data.setdefault("currency_notes", "")
+    data.setdefault("fx", {"reporting_currency": "", "base_currency": "", "rates": [], "method_note": ""})
+    for m in data.get("measures", []):
+        for p in [m.get("latest", {}), *m.get("series", [])]:
+            p.setdefault("value_base", None)
+    resp = AnalysisResponse.model_validate(data)
     warnings = consistency_warnings(resp)
     print(f"valid AnalysisResponse: {resp.symbol} signal={resp.signal.category.value} "
           f"reliability={resp.overall_reliability_pct}%")
