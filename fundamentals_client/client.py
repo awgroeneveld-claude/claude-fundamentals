@@ -366,6 +366,36 @@ def consistency_warnings(r: AnalysisResponse) -> list[str]:
     if pillar_rels and r.signal.reliability_pct > min(pillar_rels) + 20:
         w.append(f"signal reliability {r.signal.reliability_pct} > lowest pillar + 20 ({min(pillar_rels)})")
 
+    # One reporting currency per analysis: every currency / per_share measure must carry the same code.
+    codes = {m.currency for m in r.measures if m.unit.value in ("currency", "per_share")}
+    if len(codes) > 1:
+        w.append(f"mixed currencies across measures: {sorted(codes)}")
+    if "" in codes:
+        w.append("currency unit without a currency code")
+    for m in r.measures:
+        if m.unit.value in ("currency", "per_share") and m.scale.value == "not_applicable":
+            w.append(f"{m.measure_id.value}: currency amount without a scale")
+        if m.unit.value not in ("currency", "per_share") and (m.currency or m.scale.value != "not_applicable"):
+            w.append(f"{m.measure_id.value}: {m.unit.value} measure carries currency/scale")
+
+    # Base-currency conversion is optional extra value; when requested it must be complete and consistent.
+    has_base = bool(r.fx.base_currency)
+    for m in r.measures:
+        money = m.unit.value in ("currency", "per_share")
+        for p in [m.latest, *m.series]:
+            if p.value_base is not None and (not has_base or not money or p.value is None):
+                w.append(f"{m.measure_id.value}@{p.period_end}: value_base set but no base currency / not a currency / value null")
+            if has_base and money and p.value is not None and p.value_base is None:
+                w.append(f"{m.measure_id.value}@{p.period_end}: base currency requested but value_base is null")
+    if has_base and not r.fx.rates:
+        w.append("base currency requested but fx.rates is empty")
+    if not has_base and r.fx.rates:
+        w.append("fx.rates given without a base currency")
+    for fr in r.fx.rates:
+        for sid in fr.source_ids:
+            if sid not in source_ids:
+                w.append(f"fx rate {fr.period_end}: unknown source id {sid}")
+
     if r.data_mode.value == "recall_only":
         too_high = [m.measure_id.value for m in r.measures if m.reliability_pct > 35]
         if too_high:

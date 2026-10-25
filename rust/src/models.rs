@@ -267,6 +267,10 @@ pub struct AnalysisRequest {
     pub company_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reporting_currency: Option<String>,
+    /// Optional ISO 4217 code; when set, currency data points also carry `value_base` and the
+    /// response includes the fx rates used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_currency: Option<String>,
     pub period: Period,
     #[serde(default = "default_frequency")]
     pub frequency: Frequency,
@@ -319,6 +323,7 @@ impl AnalysisRequest {
             exchange: None,
             company_name: None,
             reporting_currency: None,
+            base_currency: None,
             period: Period {
                 start: start.into(),
                 end: end.into(),
@@ -358,7 +363,11 @@ pub struct Source {
 pub struct DataPoint {
     pub period_end: String,
     pub period_type: PeriodType,
+    /// In the reporting currency.
     pub value: Option<f64>,
+    /// Converted into the request's base currency (flows at average rate, stocks at closing rate,
+    /// point-in-time at spot); None when no base currency, value is None, or unit is not money.
+    pub value_base: Option<f64>,
     pub reliability_pct: u8,
     pub method: Method,
     pub source_ids: Vec<String>,
@@ -433,6 +442,30 @@ pub struct Context {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct FxRate {
+    pub period_end: String,
+    pub period_type: PeriodType,
+    /// Base-currency units per 1 reporting-currency unit, period average.
+    pub average_rate: f64,
+    /// Base-currency units per 1 reporting-currency unit at period end.
+    pub closing_rate: f64,
+    pub source_ids: Vec<String>,
+    pub reliability_pct: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Fx {
+    pub reporting_currency: String,
+    /// From the request, or empty when none was given.
+    pub base_currency: String,
+    /// One entry per period in the series; empty when no base currency.
+    pub rates: Vec<FxRate>,
+    pub method_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Pillar {
     pub pillar: PillarId,
     pub assessment: Assessment,
@@ -499,6 +532,9 @@ pub struct AnalysisResponse {
     pub pillars: Vec<Pillar>,
     pub trend_summary: TrendSummary,
     pub signal: SignalBlock,
+    /// Reporting currency, listing currency and the FX rate used for price-side conversion, or "no conversion".
+    pub currency_notes: String,
+    pub fx: Fx,
     pub sector_adjustments: Vec<String>,
     pub data_gaps: Vec<DataGap>,
     pub overall_reliability_pct: u8,

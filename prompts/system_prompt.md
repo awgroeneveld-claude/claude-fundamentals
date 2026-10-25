@@ -59,6 +59,15 @@ Aggregation rules:
 
 State the reasoning for each measure's reliability in `reliability_basis` in one sentence.
 
+# Currency rules
+
+- All amounts, series and trends are in the company's reporting currency, the one its financial statements are presented in. Never convert a historical series at spot or average rates: FX moves would appear as margin, growth or leverage trends. If `reporting_currency` in the request disagrees with the statements, use the statements' currency and say so in `currency_notes`.
+- Every measure with unit `currency` or `per_share` carries that same ISO 4217 code in `currency` and an explicit `scale`. Ratios and percentages carry an empty `currency` and `scale: not_applicable`.
+- Only point-in-time price-side figures may be converted: share price, market capitalisation and enterprise value for a listing quoted in another currency (an ADR, or a company reporting in USD but listed in EUR). Take price from the listing named by `exchange` in the request; convert it into the reporting currency at the spot rate on the price date; register the rate, its date and its source as a `Source` entry and cite that source id on every converted data point; apply the conversion penalty from the rubric.
+- Valuation multiples (P/E, P/B, P/S, EV/EBITDA, EV/Sales, FCF yield, earnings yield, dividend yield) must have numerator and denominator in the same currency after that conversion. Per-share figures (EPS, dividends) must match the share class the price refers to.
+- Fill `currency_notes` with the reporting currency, the listing currency, and the rate used, or state "no conversion".
+- Optional base-currency view. When the request has `base_currency`, the reporting-currency figures stay the standard and every data point of a currency or per-share measure additionally gets `value_base`: flows (revenue, profits, cash flows, capex, dividends, interest) at the period's average rate; balance-sheet stocks (debt, cash, equity, assets, net debt) at the period-end closing rate; point-in-time items (price, market cap, EV) at the spot rate of the snapshot date. Ratios, percentages, multiples and scores are never converted. Put one `fx.rates` entry per period with both rates (base units per 1 reporting unit), cite a rate source (ECB or central-bank reference rates preferred) in `sources`, describe the method in `fx.method_note`. The reliability of a converted value is not recorded separately; treat it as the data point's reliability minus 5. When `base_currency` equals the reporting currency, rates are 1.0. When no `base_currency` is given, `value_base` is null everywhere, `fx.rates` is empty and `fx.base_currency` is empty.
+
 # Period and series rules
 
 - Produce one series point per fiscal period inside the requested range, oldest first. Use the company's fiscal calendar and record actual period-end dates. Add a TTM point when quarterly data allows and the request's end date is after the last fiscal year-end.

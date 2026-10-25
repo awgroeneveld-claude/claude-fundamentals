@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::models::{AnalysisResponse, Assessment, DataMode, MeasureId, Signal};
+use crate::models::{AnalysisResponse, Assessment, DataMode, MeasureId, Scale, Signal, Unit};
 
 fn mean(xs: &[u8]) -> Option<f64> {
     if xs.is_empty() {
@@ -121,6 +121,73 @@ pub fn consistency_warnings(r: &AnalysisResponse) -> Vec<String> {
                 "signal reliability {} > lowest pillar + 20 ({lo})",
                 r.signal.reliability_pct
             ));
+        }
+    }
+
+    // One reporting currency per analysis: every currency / per_share measure must carry the same code.
+    let is_money = |u: Unit| matches!(u, Unit::Currency | Unit::PerShare);
+    let mut codes: Vec<&str> = r
+        .measures
+        .iter()
+        .filter(|m| is_money(m.unit))
+        .map(|m| m.currency.as_str())
+        .collect();
+    codes.sort_unstable();
+    codes.dedup();
+    if codes.len() > 1 {
+        w.push(format!("mixed currencies across measures: {codes:?}"));
+    }
+    if codes.contains(&"") {
+        w.push("currency unit without a currency code".to_string());
+    }
+    for m in &r.measures {
+        if is_money(m.unit) && m.scale == Scale::NotApplicable {
+            w.push(format!(
+                "{:?}: currency amount without a scale",
+                m.measure_id
+            ));
+        }
+        if !is_money(m.unit) && (!m.currency.is_empty() || m.scale != Scale::NotApplicable) {
+            w.push(format!(
+                "{:?}: {:?} measure carries currency/scale",
+                m.measure_id, m.unit
+            ));
+        }
+    }
+
+    // Base-currency conversion is optional extra value; when requested it must be complete and consistent.
+    let has_base = !r.fx.base_currency.is_empty();
+    for m in &r.measures {
+        let money = is_money(m.unit);
+        for p in std::iter::once(&m.latest).chain(m.series.iter()) {
+            if p.value_base.is_some() && (!has_base || !money || p.value.is_none()) {
+                w.push(format!(
+                    "{:?}@{}: value_base set but no base currency / not a currency / value null",
+                    m.measure_id, p.period_end
+                ));
+            }
+            if has_base && money && p.value.is_some() && p.value_base.is_none() {
+                w.push(format!(
+                    "{:?}@{}: base currency requested but value_base is null",
+                    m.measure_id, p.period_end
+                ));
+            }
+        }
+    }
+    if has_base && r.fx.rates.is_empty() {
+        w.push("base currency requested but fx.rates is empty".to_string());
+    }
+    if !has_base && !r.fx.rates.is_empty() {
+        w.push("fx.rates given without a base currency".to_string());
+    }
+    for fr in &r.fx.rates {
+        for sid in &fr.source_ids {
+            if !source_ids.contains(sid.as_str()) {
+                w.push(format!(
+                    "fx rate {}: unknown source id {sid}",
+                    fr.period_end
+                ));
+            }
         }
     }
 

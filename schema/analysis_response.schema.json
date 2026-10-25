@@ -132,8 +132,20 @@
               "type": "null"
             }
           ],
-          "description": "null when unavailable; never invent a number",
+          "description": "In the reporting currency; null when unavailable; never invent a number",
           "title": "Value"
+        },
+        "value_base": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "value converted into the request's base_currency (flows at the period's average rate, balance-sheet items at the closing rate, point-in-time items at spot); null when no base_currency, when value is null, or when the unit is not currency/per_share",
+          "title": "Value Base"
         },
         "reliability_pct": {
           "type": "integer",
@@ -157,6 +169,7 @@
         "period_end",
         "period_type",
         "value",
+        "value_base",
         "reliability_pct",
         "method",
         "source_ids"
@@ -172,6 +185,87 @@
         "insufficient_data"
       ],
       "title": "Direction"
+    },
+    "Fx": {
+      "type": "object",
+      "title": "Fx",
+      "properties": {
+        "reporting_currency": {
+          "type": "string",
+          "description": "ISO 4217 of the financial statements",
+          "title": "Reporting Currency"
+        },
+        "base_currency": {
+          "type": "string",
+          "description": "ISO 4217 from the request, or empty when none was given",
+          "title": "Base Currency"
+        },
+        "rates": {
+          "type": "array",
+          "description": "One entry per period in the series; empty when no base_currency",
+          "title": "Rates",
+          "items": {
+            "$ref": "#/$defs/FxRate"
+          }
+        },
+        "method_note": {
+          "type": "string",
+          "description": "Rate source (e.g. ECB reference rates), how averages were formed, caveats",
+          "title": "Method Note"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reporting_currency",
+        "base_currency",
+        "rates",
+        "method_note"
+      ]
+    },
+    "FxRate": {
+      "type": "object",
+      "title": "FxRate",
+      "properties": {
+        "period_end": {
+          "type": "string",
+          "description": "ISO date of the fiscal period end or snapshot date",
+          "title": "Period End"
+        },
+        "period_type": {
+          "$ref": "#/$defs/PeriodType"
+        },
+        "average_rate": {
+          "type": "number",
+          "description": "Units of base currency per 1 unit of reporting currency, period average",
+          "title": "Average Rate"
+        },
+        "closing_rate": {
+          "type": "number",
+          "description": "Units of base currency per 1 unit of reporting currency at period end",
+          "title": "Closing Rate"
+        },
+        "source_ids": {
+          "type": "array",
+          "title": "Source Ids",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "period_end",
+        "period_type",
+        "average_rate",
+        "closing_rate",
+        "source_ids",
+        "reliability_pct"
+      ]
     },
     "Holder": {
       "type": "object",
@@ -804,6 +898,14 @@
     "signal": {
       "$ref": "#/$defs/SignalBlock"
     },
+    "currency_notes": {
+      "type": "string",
+      "description": "Reporting currency, listing currency, and the FX rate/date/source used for price-side conversion, or 'no conversion'",
+      "title": "Currency Notes"
+    },
+    "fx": {
+      "$ref": "#/$defs/Fx"
+    },
     "sector_adjustments": {
       "type": "array",
       "description": "Threshold adjustments applied for the sector",
@@ -843,6 +945,8 @@
     "pillars",
     "trend_summary",
     "signal",
+    "currency_notes",
+    "fx",
     "sector_adjustments",
     "data_gaps",
     "overall_reliability_pct",

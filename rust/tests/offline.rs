@@ -119,7 +119,7 @@ fn request_body_matches_python_reference_shape() {
             .as_array()
             .unwrap()
             .len(),
-        16
+        18
     );
     // MeasureId must be a plain string on the wire (grammar size), enum-validated client-side.
     let defs = &body["output_config"]["format"]["schema"]["$defs"];
@@ -246,4 +246,26 @@ fn wire_schema_stays_within_union_budget() {
         "{unions} union-typed fields; API limit is 16, keep margin"
     );
     assert_eq!(optionals, 0);
+}
+
+#[test]
+fn mixed_currency_is_flagged() {
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    v["measures"][0]["currency"] = json!("USD");
+    let resp: AnalysisResponse = serde_json::from_value(v).unwrap();
+    let w = consistency_warnings(&resp);
+    assert!(w.iter().any(|x| x.contains("mixed currencies")), "{w:?}");
+}
+
+#[test]
+fn base_currency_completeness_is_checked() {
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    v["fx"]["base_currency"] = json!("EUR");
+    v["fx"]["rates"] = json!([{"period_end": "2024-12-31", "period_type": "FY", "average_rate": 1.18,
+                               "closing_rate": 1.21, "source_ids": ["S1"], "reliability_pct": 90}]);
+    let resp: AnalysisResponse = serde_json::from_value(v).unwrap();
+    let w = consistency_warnings(&resp);
+    assert!(w.iter().any(|x| x.contains("value_base is null")), "{w:?}");
 }

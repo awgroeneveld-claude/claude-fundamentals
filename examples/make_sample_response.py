@@ -30,6 +30,7 @@ def point(year, value, method, rel):
         "period_end": f"{year}-12-31",
         "period_type": "FY",
         "value": r(value),
+        "value_base": None,
         "reliability_pct": rel if value is not None else 0,
         "method": method if value is not None else "unavailable",
         "source_ids": [S1] if value is not None else [],
@@ -177,6 +178,8 @@ resp = {
         "conditions_for_upgrade": ["Cash conversion back above 1.0 for two consecutive years", "Capex normalising so FCF covers distributions", "Interest coverage above 6x"],
         "conditions_for_downgrade": ["Valuation data showing P/E or EV/EBITDA above peer median", "Further coverage decline below 3x", "Dividend maintained with continued negative FCF"],
     },
+    "currency_notes": "Reporting currency GBP (statements); no listing price supplied; no conversion.",
+    "fx": {"reporting_currency": "GBP", "base_currency": "", "rates": [], "method_note": "No base currency requested."},
     "sector_adjustments": ["Industrial machinery: D/E up to ~1.0 and net debt/EBITDA up to ~2.5x treated as moderate rather than high."],
     "data_gaps": [
         {"measure_id": "net_debt_to_ebitda", "description": "No depreciation/amortisation in supplied_data; cannot compute EBITDA."},

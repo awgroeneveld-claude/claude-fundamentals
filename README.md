@@ -53,6 +53,8 @@ validation. The Python CLI has `--yaml` for that.
 }
 ```
 
+* `reporting_currency` is a hint; the statements' own currency wins. `base_currency` (optional) asks
+  for an extra converted view, see "Currencies" below.
 * `categories` selects framework sections 1.1 to 1.8; `measures` optionally whitelists individual
   measure ids (the catalogue is the `MeasureId` enum in `fundamentals_client/models.py` and
   `rust/src/models.rs`).
@@ -74,7 +76,7 @@ validation. The Python CLI has `--yaml` for that.
 schema_version, symbol, company_name, analysis_date, data_mode (supplied|retrieved|mixed|recall_only),
 sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|supplied_screenshot|web_other|model_recall), title, url, period_covered, retrieved_at  ("" when n/a)
 measures[]       measure_id, category, label, unit, currency, scale,
-                 latest {period_end, period_type, value|null, reliability_pct, method, source_ids[]},
+                 latest {period_end, period_type, value|null, value_base|null, reliability_pct, method, source_ids[]},
                  series[] (same shape, oldest first),
                  trend {direction, cagr_pct, latest_yoy_change_pct, coefficient_of_variation, vs_own_history, vs_peers, reliability_pct, comment},
                  reliability_pct, reliability_basis, notes
@@ -85,11 +87,33 @@ pillars[]        valuation | profitability_stability | debt_health | earnings_qu
 trend_summary    overall_direction, improving[], stable[], deteriorating[], inflections[], operating_vs_non_operating, reliability_pct
 signal           category (extreme_buy|buy|hold|sell|extreme_sell), conviction_pct, reliability_pct, rationale,
                  green_flags[], red_flags[], conditions_for_upgrade[], conditions_for_downgrade[]
+currency_notes, fx {reporting_currency, base_currency, rates[] {period_end, period_type, average_rate, closing_rate, source_ids[], reliability_pct}, method_note}
 sector_adjustments[], data_gaps[], overall_reliability_pct, disclaimer
 ```
 
 A complete, rule-conformant example is `examples/sample_response.json` (hand-built from the
 supplied-data request by `examples/make_sample_response.py`, not model output).
+
+### Currencies
+
+One standard, one optional extra:
+
+* **Every amount, series and trend is in the company's reporting currency**, the currency of its
+  financial statements. Historical series are never converted: converting at spot or average rates
+  would turn FX moves into fake margin, growth and leverage trends. Both clients warn if a response
+  mixes currency codes across measures.
+* **Price-side figures are the one exception.** Share price, market cap and enterprise value come
+  from the listing named by `exchange` and are converted into the reporting currency when that
+  listing trades in another currency (an ADR, or a USD reporter listed in EUR), so valuation
+  multiples compare like with like. The rate, its date and its source are registered as a `Source`,
+  and `currency_notes` states what was done.
+* **Optional base-currency view.** Set `base_currency` in the request (say `EUR` for a euro-based
+  portfolio) and every currency or per-share data point also carries `value_base`, converted with
+  the accounting-correct rate: flows at the period's average rate, balance-sheet items at the
+  closing rate, point-in-time items at spot. The rates themselves are returned in `fx.rates`, one
+  row per period with sources, so your app can audit or recompute them. Ratios, percentages and
+  multiples are never converted. Without `base_currency`, `value_base` is null everywhere and
+  `fx.rates` is empty; the clients check both directions for consistency.
 
 ### Reliability: what the percentage means
 

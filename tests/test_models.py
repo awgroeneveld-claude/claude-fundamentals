@@ -106,5 +106,21 @@ def test_union_and_optional_budget():
         for v in props.values():
             if "anyOf" in v or "oneOf" in v or isinstance(v.get("type"), list):
                 unions += 1
-    assert unions <= 6, f"{unions} union-typed fields; API limit 16, keep margin"
+    assert unions <= 8, f"{unions} union-typed fields; API limit 16, keep margin"
     assert optionals == 0
+
+
+def test_mixed_currency_is_flagged():
+    data = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    data["measures"][0]["currency"] = "USD"  # revenue in USD while the rest is GBP
+    w = consistency_warnings(AnalysisResponse.model_validate(data))
+    assert any("mixed currencies" in x for x in w), w
+
+
+def test_base_currency_completeness_is_checked():
+    data = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    data["fx"]["base_currency"] = "EUR"
+    data["fx"]["rates"] = [{"period_end": "2024-12-31", "period_type": "FY", "average_rate": 1.18,
+                            "closing_rate": 1.21, "source_ids": ["S1"], "reliability_pct": 90}]
+    w = consistency_warnings(AnalysisResponse.model_validate(data))
+    assert any("value_base is null" in x for x in w), w

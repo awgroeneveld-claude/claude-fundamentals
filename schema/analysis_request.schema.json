@@ -144,8 +144,21 @@
         }
       ],
       "default": null,
-      "description": "ISO 4217, e.g. USD, EUR",
+      "description": "ISO 4217 hint, e.g. USD, EUR",
       "title": "Reporting Currency"
+    },
+    "base_currency": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional ISO 4217 code. When set, every currency data point also carries value_base converted into this currency, and the response includes the fx rates used.",
+      "title": "Base Currency"
     },
     "period": {
       "$ref": "#/$defs/Period"

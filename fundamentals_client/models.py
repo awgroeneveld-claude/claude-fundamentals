@@ -277,7 +277,12 @@ class AnalysisRequest(Strict):
     symbol: str = Field(description="Ticker symbol, e.g. AAPL, ASML, 'ASML.AS'")
     exchange: str | None = Field(default=None, description="Exchange hint, e.g. NASDAQ, Euronext Amsterdam")
     company_name: str | None = None
-    reporting_currency: str | None = Field(default=None, description="ISO 4217, e.g. USD, EUR")
+    reporting_currency: str | None = Field(default=None, description="ISO 4217 hint, e.g. USD, EUR")
+    base_currency: str | None = Field(
+        default=None,
+        description="Optional ISO 4217 code. When set, every currency data point also carries value_base "
+        "converted into this currency, and the response includes the fx rates used.",
+    )
     period: Period
     frequency: Frequency = Frequency.annual
     categories: list[Category] = Field(
@@ -328,7 +333,12 @@ class Source(Strict):
 class DataPoint(Strict):
     period_end: str = Field(description="ISO date of the period end (or snapshot date)")
     period_type: PeriodType
-    value: float | None = Field(description="null when unavailable; never invent a number")
+    value: float | None = Field(description="In the reporting currency; null when unavailable; never invent a number")
+    value_base: float | None = Field(
+        description="value converted into the request's base_currency (flows at the period's average rate, "
+        "balance-sheet items at the closing rate, point-in-time items at spot); null when no base_currency, "
+        "when value is null, or when the unit is not currency/per_share"
+    )
     reliability_pct: int = Field(ge=0, le=100, description="0-100 per the rubric in the system prompt")
     method: Method
     source_ids: list[str] = Field(description="ids from `sources`; empty only when method is unavailable")
@@ -388,6 +398,22 @@ class Context(Strict):
     reliability_pct: int = Field(ge=0, le=100)
 
 
+class FxRate(Strict):
+    period_end: str = Field(description="ISO date of the fiscal period end or snapshot date")
+    period_type: PeriodType
+    average_rate: float = Field(description="Units of base currency per 1 unit of reporting currency, period average")
+    closing_rate: float = Field(description="Units of base currency per 1 unit of reporting currency at period end")
+    source_ids: list[str]
+    reliability_pct: int = Field(ge=0, le=100)
+
+
+class Fx(Strict):
+    reporting_currency: str = Field(description="ISO 4217 of the financial statements")
+    base_currency: str = Field(description="ISO 4217 from the request, or empty when none was given")
+    rates: list[FxRate] = Field(description="One entry per period in the series; empty when no base_currency")
+    method_note: str = Field(description="Rate source (e.g. ECB reference rates), how averages were formed, caveats")
+
+
 class Pillar(Strict):
     pillar: PillarId
     assessment: Assessment
@@ -444,6 +470,11 @@ class AnalysisResponse(Strict):
     pillars: list[Pillar]
     trend_summary: TrendSummary
     signal: SignalBlock
+    currency_notes: str = Field(
+        description="Reporting currency, listing currency, and the FX rate/date/source used for price-side "
+        "conversion, or 'no conversion'"
+    )
+    fx: Fx
     sector_adjustments: list[str] = Field(description="Threshold adjustments applied for the sector")
     data_gaps: list[DataGap]
     overall_reliability_pct: int = Field(ge=0, le=100)
