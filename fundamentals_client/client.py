@@ -54,8 +54,8 @@ SANDBOX_OUTPUT_INSTRUCTION = (
 )
 
 WEB_TOOLS: list[dict[str, Any]] = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 15},
-    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10, "max_content_tokens": 60_000},
+    {"type": "web_search_20260209", "name": "web_search", "max_uses": 30},
+    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 60_000},
 ]
 
 
@@ -282,7 +282,10 @@ class FundamentalsClient:
         request_ids: list[str] = []
         started = time.monotonic()
         final = None
+        container_id: str | None = None
         for attempt in range(MAX_PAUSE_RESUMES + 1):
+            if container_id:
+                kwargs["container"] = container_id  # keep the sandbox (files, Python state) on resume
             with self.client.beta.messages.stream(messages=messages, **kwargs) as stream:
                 if self.progress:
                     rid = stream.response.headers.get("request-id", "-")
@@ -294,7 +297,10 @@ class FundamentalsClient:
                 request_ids.append(final._request_id)
             if final.stop_reason != "pause_turn":
                 break
-            # Long server-tool turn paused: append the partial assistant turn and resume.
+            # Long server-tool turn paused: append the partial assistant turn and resume in the same container.
+            container = getattr(final, "container", None)
+            if container is not None and getattr(container, "id", None):
+                container_id = container.id
             messages.append({"role": "assistant", "content": final.content})
         else:
             raise AnalysisIncomplete(f"turn still paused after {MAX_PAUSE_RESUMES} resumes")
@@ -325,6 +331,8 @@ class FundamentalsClient:
         raw_json = parsed.model_dump_json(indent=2)
 
         warnings = consistency_warnings(parsed)
+        if req.images and not any(src.type.value == "supplied_screenshot" for src in parsed.sources):
+            warnings.append(f"{len(req.images)} screenshot(s) were attached but no supplied_screenshot source was registered")
         return AnalysisResult(
             response=parsed,
             raw_json=raw_json,
@@ -396,7 +404,9 @@ def consistency_warnings(r: AnalysisResponse) -> list[str]:
             for sid in p.source_ids:
                 if sid not in source_ids:
                     w.append(f"{m.measure_id.value}@{p.period_end}: unknown source id {sid}")
-        series_rel = sorted(p.reliability_pct for p in m.series if p.value is not None)
+        # Trend statistics use annual-like points; quarterly points don't bound the trend's reliability.
+        annual_like = [p.reliability_pct for p in m.series if p.value is not None and p.period_type.value != "Q"]
+        series_rel = sorted(annual_like or [p.reliability_pct for p in m.series if p.value is not None])
         if series_rel:
             median = series_rel[len(series_rel) // 2]
             if m.trend.reliability_pct > median:

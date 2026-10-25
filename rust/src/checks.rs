@@ -44,12 +44,23 @@ pub fn consistency_warnings(r: &AnalysisResponse) -> Vec<String> {
                 }
             }
         }
-        let mut series_rel: Vec<u8> = m
+        // Trend statistics are computed on the annual-like points (FY/TTM/FWD/POINT); quarterly
+        // points only feed comments and inflections, so they don't bound the trend's reliability.
+        let annual_like: Vec<u8> = m
             .series
             .iter()
-            .filter(|p| p.value.is_some())
+            .filter(|p| p.value.is_some() && p.period_type != crate::models::PeriodType::Q)
             .map(|p| p.reliability_pct)
             .collect();
+        let mut series_rel: Vec<u8> = if annual_like.is_empty() {
+            m.series
+                .iter()
+                .filter(|p| p.value.is_some())
+                .map(|p| p.reliability_pct)
+                .collect()
+        } else {
+            annual_like
+        };
         series_rel.sort_unstable();
         if !series_rel.is_empty() {
             let median = series_rel[series_rel.len() / 2];

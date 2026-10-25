@@ -193,3 +193,14 @@ def test_file_ids_in_tool_results():
          "content": [{"type": "code_execution_output", "file_id": "file_abc"}]}},
     ]
     assert file_ids_in(content) == ["file_abc"]
+
+
+def test_quarterly_points_do_not_bound_trend_reliability():
+    data = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    series = data["measures"][0]["series"]
+    for d in ["2024-09-30", "2024-12-31"]:
+        series.append({"period_end": d, "period_type": "Q", "value": 500.0, "value_base": None,
+                       "reliability_pct": 40, "method": "derived", "source_ids": ["S1"]})
+    series.sort(key=lambda p: p["period_end"])
+    w = consistency_warnings(AnalysisResponse.model_validate(data))
+    assert not any("trend reliability" in x for x in w), w

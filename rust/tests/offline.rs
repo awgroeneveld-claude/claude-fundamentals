@@ -600,3 +600,56 @@ fn sandbox_mode_adds_code_execution_and_instruction() {
         ]
     );
 }
+
+#[test]
+fn quarterly_points_do_not_bound_trend_reliability() {
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    let series = v["measures"][0]["series"].as_array_mut().unwrap();
+    for d in ["2024-09-30", "2024-12-31"] {
+        series.push(
+            json!({"period_end": d, "period_type": "Q", "value": 500.0, "value_base": null,
+                           "reliability_pct": 40, "method": "derived", "source_ids": ["S1"]}),
+        );
+    }
+    series.sort_by(|a, b| a["period_end"].as_str().cmp(&b["period_end"].as_str()));
+    let resp: AnalysisResponse = serde_json::from_value(v).unwrap();
+    let w = consistency_warnings(&resp);
+    assert!(!w.iter().any(|x| x.contains("trend reliability")), "{w:?}");
+}
+
+#[test]
+fn every_schema_enum_value_deserializes_in_rust() {
+    use fundamentals_client::models::*;
+    let schema: Value =
+        serde_json::from_str(fundamentals_client::client::RESPONSE_SCHEMA_JSON).unwrap();
+    let defs = schema["$defs"].as_object().unwrap();
+    let mut checked = 0;
+    for (name, def) in defs {
+        let Some(values) = def.get("enum").and_then(Value::as_array) else {
+            continue;
+        };
+        for v in values {
+            let ok = match name.as_str() {
+                "Category" => serde_json::from_value::<Category>(v.clone()).is_ok(),
+                "Unit" => serde_json::from_value::<Unit>(v.clone()).is_ok(),
+                "Scale" => serde_json::from_value::<Scale>(v.clone()).is_ok(),
+                "Method" => serde_json::from_value::<Method>(v.clone()).is_ok(),
+                "PeriodType" => serde_json::from_value::<PeriodType>(v.clone()).is_ok(),
+                "Frequency" => serde_json::from_value::<Frequency>(v.clone()).is_ok(),
+                "Direction" => serde_json::from_value::<Direction>(v.clone()).is_ok(),
+                "RelativePosition" => serde_json::from_value::<RelativePosition>(v.clone()).is_ok(),
+                "PeerComparison" => serde_json::from_value::<PeerComparison>(v.clone()).is_ok(),
+                "SourceType" => serde_json::from_value::<SourceType>(v.clone()).is_ok(),
+                "Signal" => serde_json::from_value::<Signal>(v.clone()).is_ok(),
+                "PillarId" => serde_json::from_value::<PillarId>(v.clone()).is_ok(),
+                "Assessment" => serde_json::from_value::<Assessment>(v.clone()).is_ok(),
+                "DataMode" => serde_json::from_value::<DataMode>(v.clone()).is_ok(),
+                other => panic!("schema enum {other} has no Rust mapping in this test"),
+            };
+            assert!(ok, "{name}: value {v} does not deserialize in Rust");
+            checked += 1;
+        }
+    }
+    assert!(checked > 40, "only {checked} enum values checked");
+}

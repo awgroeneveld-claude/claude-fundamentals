@@ -189,8 +189,8 @@ pub const SANDBOX_OUTPUT_INSTRUCTION: &str = "Output delivery: build the final J
 
 pub fn web_tools() -> Vec<Value> {
     vec![
-        json!({"type": "web_search_20260209", "name": "web_search", "max_uses": 15}),
-        json!({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10, "max_content_tokens": 60000}),
+        json!({"type": "web_search_20260209", "name": "web_search", "max_uses": 30}),
+        json!({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 60000}),
     ]
 }
 
@@ -375,14 +375,21 @@ impl FundamentalsClient {
         let mut request_ids = Vec::new();
         let mut final_msg: Option<Message> = None;
 
+        let mut container: Option<String> = None;
         for _ in 0..=MAX_PAUSE_RESUMES {
-            let body = self.build_body(req, &messages);
+            let mut body = self.build_body(req, &messages);
+            if let Some(c) = &container {
+                body["container"] = json!(c);
+            }
             let (msg, rid) = self.stream_message(&body).await?;
             usage.add(&msg.usage);
             if let Some(r) = rid {
                 request_ids.push(r);
             }
             if msg.stop_reason.as_deref() == Some("pause_turn") {
+                if msg.container_id.is_some() {
+                    container = msg.container_id.clone();
+                }
                 // Long server-tool turn paused: echo the partial assistant turn and resume.
                 messages.push(json!({"role": "assistant", "content": msg.content}));
                 continue;
@@ -454,7 +461,18 @@ impl FundamentalsClient {
             return Err(Error::Range(range));
         }
         let raw_json = serde_json::to_string_pretty(&response)?;
-        let warnings = consistency_warnings(&response);
+        let mut warnings = consistency_warnings(&response);
+        if !req.images.is_empty()
+            && !response
+                .sources
+                .iter()
+                .any(|x| x.source_type == crate::models::SourceType::SuppliedScreenshot)
+        {
+            warnings.push(format!(
+                "{} screenshot(s) were attached but no supplied_screenshot source was registered",
+                req.images.len()
+            ));
+        }
         Ok(AnalysisResult {
             response,
             raw_json,

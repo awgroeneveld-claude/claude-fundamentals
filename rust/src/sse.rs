@@ -88,6 +88,9 @@ pub struct Message {
     pub stop_details: Option<Value>,
     pub content: Vec<Value>,
     pub usage: Map<String, Value>,
+    /// Code-execution container id; pass it back as `container` when resuming a paused turn so
+    /// the sandbox (files, Python state) survives.
+    pub container_id: Option<String>,
 }
 
 impl Message {
@@ -172,6 +175,9 @@ impl MessageAccumulator {
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string();
+                if let Some(id) = m.pointer("/container/id").and_then(Value::as_str) {
+                    self.message.container_id = Some(id.to_string());
+                }
                 if let Some(Value::Object(u)) = m.get("usage") {
                     merge_usage(&mut self.message.usage, u);
                 }
@@ -300,6 +306,9 @@ impl MessageAccumulator {
                 if let Some(d) = v.get("delta") {
                     if let Some(s) = d.get("stop_reason").and_then(Value::as_str) {
                         self.message.stop_reason = Some(s.to_string());
+                    }
+                    if let Some(id) = d.pointer("/container/id").and_then(Value::as_str) {
+                        self.message.container_id = Some(id.to_string());
                     }
                     if let Some(sd) = d.get("stop_details") {
                         if !sd.is_null() {
@@ -456,6 +465,17 @@ mod tests {
             seen.last().unwrap(),
             "turn ended: end_turn (42 output tokens)"
         );
+    }
+
+    #[test]
+    fn container_id_is_captured() {
+        let mut p = SseParser::default();
+        let mut acc = MessageAccumulator::default();
+        p.push(b"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"pause_turn\",\"container\":{\"id\":\"container_abc\",\"expires_at\":\"2026-10-25T12:00:00Z\"}},\"usage\":{\"output_tokens\":1}}\n\n");
+        let ev = p.next_event().unwrap();
+        acc.apply(&ev).unwrap();
+        assert_eq!(acc.message.container_id.as_deref(), Some("container_abc"));
+        assert_eq!(acc.message.stop_reason.as_deref(), Some("pause_turn"));
     }
 
     #[test]

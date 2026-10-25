@@ -165,6 +165,7 @@ str_enum!(SourceType {
     CompanyIr,
     Aggregator,
     SuppliedInput,
+    SuppliedScreenshot,
     WebOther,
     ModelRecall
 });

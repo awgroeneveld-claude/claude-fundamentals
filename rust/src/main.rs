@@ -268,8 +268,12 @@ async fn main() -> anyhow::Result<()> {
                 r.overall_reliability_pct, r.data_mode
             );
             eprintln!(
-                "model={} turns={} in={} cached={} out={} web_searches={} elapsed={:.0?} request_ids={:?}",
-                result.model, u.turns, u.input_tokens, u.cache_read_input_tokens, u.output_tokens,
+                "model={} turns={} in={} cache_read={} cache_write={} out={} web_searches={} elapsed={:.0?} request_ids={:?}",
+                result.model,
+                u.turns,
+                u.input_tokens,
+                u.cache_read_input_tokens,
+                u.cache_creation_input_tokens, u.output_tokens,
                 u.web_search_requests, result.elapsed, result.request_ids
             );
             for w in &result.warnings {
