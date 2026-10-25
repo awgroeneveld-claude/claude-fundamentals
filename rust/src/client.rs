@@ -189,8 +189,8 @@ pub const SANDBOX_OUTPUT_INSTRUCTION: &str = "Output delivery: build the final J
 
 pub fn web_tools() -> Vec<Value> {
     vec![
-        json!({"type": "web_search_20260209", "name": "web_search", "max_uses": 30}),
-        json!({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 60000}),
+        json!({"type": "web_search_20260209", "name": "web_search", "max_uses": 50}),
+        json!({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 100000}),
     ]
 }
 

@@ -54,8 +54,8 @@ SANDBOX_OUTPUT_INSTRUCTION = (
 )
 
 WEB_TOOLS: list[dict[str, Any]] = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 30},
-    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 60_000},
+    {"type": "web_search_20260209", "name": "web_search", "max_uses": 50},
+    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 30, "max_content_tokens": 100000},
 ]
 
 

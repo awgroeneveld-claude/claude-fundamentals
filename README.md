@@ -228,8 +228,10 @@ Why each piece:
 * **Long turns resume in the same sandbox.** A research turn can stop with `pause_turn`; both
   clients resend the partial turn together with the `container` id from the paused response, so
   the files and Python state the model built survive. (The Porsche SE run lost its sandbox at the
-  pause and rebuilt it, costing about 25k output tokens.) Web search and fetch are capped at 30
-  uses each per request; the earlier caps of 15 and 10 ran out on a nine-year holding-company run.
+  pause and rebuilt it, costing about 25k output tokens.) Web search is capped at 50 uses and web
+  fetch at 30 per request, with up to 100k tokens per fetched document (large interim reports
+  were cut off at 60k). The model calls both from inside the sandbox, so fetched documents are
+  parsed there and do not enter the context window; a search costs USD 0.01.
 * **Prompt caching.** The system prompt is ~2.5k tokens and byte-identical across calls, so it is
   marked for caching and the volatile request goes in the user message after it. Check
   `usage.cache_read_input_tokens` on the second call.
