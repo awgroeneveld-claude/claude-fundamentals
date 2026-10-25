@@ -105,6 +105,8 @@ impl Message {
 /// Human-readable progress derived from the stream, for logging while a long turn runs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Progress {
+    /// Response headers arrived (HTTP status, request id), before any stream event.
+    Connected { status: u16, request_id: String },
     /// A turn started (message id, model).
     TurnStart { id: String, model: String },
     /// Claude is thinking (one notice per thinking block).
@@ -330,6 +332,9 @@ impl MessageAccumulator {
 impl std::fmt::Display for Progress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Progress::Connected { status, request_id } => {
+                write!(f, "connected: HTTP {status}, request-id {request_id}")
+            }
             Progress::TurnStart { id, model } => write!(f, "turn started ({model}, {id})"),
             Progress::Thinking => write!(f, "thinking..."),
             Progress::ToolCall { name, detail } => write!(f, "{name}: {detail}"),

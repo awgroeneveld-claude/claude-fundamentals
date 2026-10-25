@@ -256,6 +256,8 @@ class FundamentalsClient:
         for attempt in range(MAX_PAUSE_RESUMES + 1):
             with self.client.beta.messages.stream(messages=messages, **kwargs) as stream:
                 if self.progress:
+                    rid = stream.response.headers.get("request-id", "-")
+                    self.progress(f"connected: HTTP {stream.response.status_code}, request-id {rid}")
                     self._report_progress(stream)
                 final = stream.get_final_message()
             usage.add(final.usage)

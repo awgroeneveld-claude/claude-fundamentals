@@ -438,6 +438,12 @@ impl FundamentalsClient {
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
         let status = resp.status();
+        if let Some(sink) = &self.cfg.progress {
+            sink(&Progress::Connected {
+                status: status.as_u16(),
+                request_id: request_id.clone().unwrap_or_else(|| "-".into()),
+            });
+        }
         if !status.is_success() {
             let retry_hdr = resp
                 .headers()
