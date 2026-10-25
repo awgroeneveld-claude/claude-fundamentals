@@ -161,7 +161,11 @@ class FundamentalsClient:
         system_prompt: str | None = None,
         use_server_fallbacks: bool = True,
         show_thinking_summary: bool = False,
+        enforce_schema: bool = True,
     ):
+        """`enforce_schema=False` drops `output_config.format` (API-side grammar) and instead appends the
+        schema to the system prompt; the reply is still validated client-side. Use it if the API
+        rejects the schema as too large to compile."""
         self.client = client or anthropic.Anthropic()  # credentials from env / `ant auth login`
         self.model = model
         self.effort = effort
@@ -169,6 +173,14 @@ class FundamentalsClient:
         self.system_prompt = system_prompt or load_system_prompt()
         self.use_server_fallbacks = use_server_fallbacks
         self.show_thinking_summary = show_thinking_summary
+        self.enforce_schema = enforce_schema
+        if not enforce_schema:
+            from anthropic.lib._parse._transform import transform_schema
+
+            self.system_prompt += (
+                "\n\n# Output schema\n\nReturn exactly one JSON object, no prose and no code fences, "
+                "conforming to this JSON Schema:\n\n" + json.dumps(transform_schema(AnalysisResponse), separators=(",", ":"))
+            )
 
     # ------------------------------------------------------------------ #
     def analyze(
@@ -186,8 +198,9 @@ class FundamentalsClient:
             max_tokens=self.max_tokens,
             system=[{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}],
             output_config={"effort": self.effort},
-            output_format=AnalysisResponse,
         )
+        if self.enforce_schema:
+            kwargs["output_format"] = AnalysisResponse
         if self.show_thinking_summary:
             kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
         if tools:
@@ -230,7 +243,7 @@ class FundamentalsClient:
         if parsed is None:
             if not text_blocks:
                 raise AnalysisIncomplete(f"no text block in final message (stop_reason={final.stop_reason})")
-            parsed = AnalysisResponse.model_validate_json(text_blocks[-1].text)
+            parsed = AnalysisResponse.model_validate_json(_strip_fences(text_blocks[-1].text))
         raw_json = parsed.model_dump_json(indent=2)
 
         warnings = consistency_warnings(parsed)
@@ -243,6 +256,15 @@ class FundamentalsClient:
             elapsed_s=time.monotonic() - started,
             request_ids=request_ids,
         )
+
+
+def _strip_fences(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else ""
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+    return t.strip()
 
 
 # ---------------------------------------------------------------------- #

@@ -111,6 +111,9 @@ pub struct Config {
     pub use_server_fallbacks: bool,
     pub show_thinking_summary: bool,
     pub system_prompt: String,
+    /// true: send the schema as `output_config.format` (API-side grammar). false: append the schema
+    /// to the system prompt and rely on client-side validation (use if the API rejects the grammar).
+    pub enforce_schema: bool,
 }
 
 impl Config {
@@ -128,6 +131,7 @@ impl Config {
             use_server_fallbacks: true,
             show_thinking_summary: false,
             system_prompt: SYSTEM_PROMPT.into(),
+            enforce_schema: true,
         })
     }
 }
@@ -233,6 +237,13 @@ impl FundamentalsClient {
             .read_timeout(Duration::from_secs(300))
             .build()?;
         let schema: Value = serde_json::from_str(RESPONSE_SCHEMA_JSON)?;
+        let mut cfg = cfg;
+        if !cfg.enforce_schema {
+            cfg.system_prompt.push_str(
+                "\n\n# Output schema\n\nReturn exactly one JSON object, no prose and no code fences, conforming to this JSON Schema:\n\n",
+            );
+            cfg.system_prompt.push_str(&serde_json::to_string(&schema)?);
+        }
         Ok(Self { http, cfg, schema })
     }
 
@@ -251,12 +262,12 @@ impl FundamentalsClient {
                 "text": self.cfg.system_prompt,
                 "cache_control": {"type": "ephemeral"}
             }],
-            "output_config": {
-                "effort": self.cfg.effort,
-                "format": {"type": "json_schema", "schema": self.schema}
-            },
+            "output_config": {"effort": self.cfg.effort},
             "messages": messages,
         });
+        if self.cfg.enforce_schema {
+            body["output_config"]["format"] = json!({"type": "json_schema", "schema": self.schema});
+        }
         if self.cfg.show_thinking_summary {
             body["thinking"] = json!({"type": "adaptive", "display": "summarized"});
         }
@@ -340,7 +351,7 @@ impl FundamentalsClient {
         let text = msg.last_text().ok_or_else(|| {
             Error::Incomplete(format!("no text block (stop_reason={:?})", msg.stop_reason))
         })?;
-        let response: AnalysisResponse = serde_json::from_str(text)?;
+        let response: AnalysisResponse = serde_json::from_str(strip_fences(text))?;
         let range = validate_ranges(&response);
         if !range.is_empty() {
             return Err(Error::Range(range));
@@ -430,6 +441,16 @@ impl FundamentalsClient {
         }
         Ok((acc.message, request_id))
     }
+}
+
+/// Tolerate a ```json fence when the schema is not API-enforced.
+fn strip_fences(text: &str) -> &str {
+    let t = text.trim();
+    if let Some(rest) = t.strip_prefix("```") {
+        let rest = rest.split_once('\n').map(|(_, body)| body).unwrap_or("");
+        return rest.trim_end().strip_suffix("```").unwrap_or(rest).trim();
+    }
+    t
 }
 
 fn is_retryable(e: &Error) -> bool {

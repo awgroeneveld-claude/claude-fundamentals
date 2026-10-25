@@ -22,6 +22,7 @@ fn cfg() -> Config {
         use_server_fallbacks: true,
         show_thinking_summary: false,
         system_prompt: fundamentals_client::client::SYSTEM_PROMPT.into(),
+        enforce_schema: true,
     }
 }
 
@@ -117,7 +118,14 @@ fn request_body_matches_python_reference_shape() {
             .as_array()
             .unwrap()
             .len(),
-        15
+        16
+    );
+    // MeasureId must be a plain string on the wire (grammar size), enum-validated client-side.
+    let defs = &body["output_config"]["format"]["schema"]["$defs"];
+    assert!(
+        defs.get("MeasureId")
+            .map_or(true, |d| d.get("enum").is_none()),
+        "MeasureId must not be an enum in the wire schema"
     );
     assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
     let tools: Vec<&str> = body["tools"]
@@ -180,4 +188,18 @@ fn images_become_blocks_before_the_text() {
         "image payload must not be duplicated in the JSON text"
     );
     std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn schema_enforcement_can_be_turned_off() {
+    let mut c = cfg();
+    c.enforce_schema = false;
+    let client = FundamentalsClient::new(c).unwrap();
+    let req = AnalysisRequest::new("X", "2020-01-01", "2024-12-31");
+    let body = client.build_body(&req, &[]);
+    assert!(body["output_config"].get("format").is_none());
+    assert!(body["system"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("# Output schema"));
 }

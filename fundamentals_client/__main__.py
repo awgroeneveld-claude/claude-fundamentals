@@ -36,7 +36,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     data = Path(args.file).read_text(encoding="utf-8")
     resp = AnalysisResponse.model_validate_json(data)
     warnings = consistency_warnings(resp)
-    print(f"valid AnalysisResponse: {resp.request.symbol} signal={resp.signal.category.value} "
+    print(f"valid AnalysisResponse: {resp.symbol} signal={resp.signal.category.value} "
           f"reliability={resp.overall_reliability_pct}%")
     for w in warnings:
         print(f"  warning: {w}")
@@ -47,7 +47,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from .client import AnalysisIncomplete, AnalysisRefused, FundamentalsClient
 
     req = AnalysisRequest.model_validate_json(Path(args.request).read_text(encoding="utf-8"))
-    client = FundamentalsClient(model=args.model, effort=args.effort, max_tokens=args.max_tokens)
+    client = FundamentalsClient(
+        model=args.model, effort=args.effort, max_tokens=args.max_tokens, enforce_schema=not args.no_schema_enforcement
+    )
     try:
         result = client.analyze(req, image_base_dir=Path(args.request).resolve().parent)
     except AnalysisRefused as e:
@@ -78,7 +80,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     r = result.response
     u = result.usage
     print(
-        f"\n{r.request.symbol}: {r.signal.category.value} "
+        f"\n{r.symbol}: {r.signal.category.value} "
         f"(conviction {r.signal.conviction_pct}%, reliability {r.signal.reliability_pct}%), "
         f"overall reliability {r.overall_reliability_pct}%, data_mode={r.data_mode.value}",
         file=sys.stderr,
@@ -104,6 +106,11 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--model", default="claude-opus-5-5")
     a.add_argument("--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"])
     a.add_argument("--max-tokens", type=int, default=64_000)
+    a.add_argument(
+        "--no-schema-enforcement",
+        action="store_true",
+        help="do not send the schema as output_config.format; put it in the prompt and validate client-side",
+    )
     a.set_defaults(fn=cmd_analyze)
 
     s = sub.add_parser("schema", help="export JSON Schemas for request and response")

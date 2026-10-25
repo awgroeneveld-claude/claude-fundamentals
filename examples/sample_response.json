@@ -1,20 +1,7 @@
 {
   "schema_version": "1.0",
-  "request": {
-    "symbol": "EXMP",
-    "company_name": "Example Industries plc",
-    "exchange": null,
-    "reporting_currency": "GBP",
-    "period_start": "2021-01-01",
-    "period_end": "2024-12-31",
-    "frequency": "annual",
-    "categories": [
-      "profitability",
-      "leverage",
-      "cash_flow_quality",
-      "growth"
-    ]
-  },
+  "symbol": "EXMP",
+  "company_name": "Example Industries plc",
   "analysis_date": "2026-10-25",
   "data_mode": "supplied",
   "sources": [

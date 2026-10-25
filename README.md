@@ -71,7 +71,7 @@ validation. The Python CLI has `--yaml` for that.
 **Response** (`schema/analysis_response.schema.json`, enforced by the API). Top level:
 
 ```
-schema_version, request (echo), analysis_date, data_mode (supplied|retrieved|mixed|recall_only),
+schema_version, symbol, company_name, analysis_date, data_mode (supplied|retrieved|mixed|recall_only),
 sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|supplied_screenshot|web_other|model_recall), title, url, period_covered, retrieved_at
 measures[]       measure_id, category, label, unit, currency, scale,
                  latest {period_end, period_type, value|null, reliability_pct, method, source_ids[]},
@@ -148,7 +148,14 @@ Why each piece:
 * **Streaming.** Thinking plus a large JSON document can take minutes; non-streaming requests risk
   HTTP timeouts. The Rust client parses the SSE events itself (`rust/src/sse.rs`).
 * **Structured outputs.** The checked-in schema is sent on every call. The first call with a new
-  schema pays a one-time compilation cost; after that it is cached for 24 h.
+  schema pays a one-time compilation cost; after that it is cached for 24 h. The API compiles the
+  schema into a decoding grammar with a size limit: the first live run hit it (`400 The compiled
+  grammar is too large`) because the 80-value measure-id enum was referenced from six places. On
+  the wire `measure_id` is therefore a plain string; the catalogue lives in the system prompt and
+  membership is enforced client-side when the response is parsed. If the limit is ever hit again,
+  pass `--no-schema-enforcement` (both CLIs; `enforce_schema=false` / `Config.enforce_schema`): the
+  schema then goes into the system prompt instead of `output_config.format`, and the reply is
+  validated client-side only.
 * **Prompt caching.** The system prompt is ~2.5k tokens and byte-identical across calls, so it is
   marked for caching and the volatile request goes in the user message after it. Check
   `usage.cache_read_input_tokens` on the second call.

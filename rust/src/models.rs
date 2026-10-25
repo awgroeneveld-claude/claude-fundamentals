@@ -477,22 +477,10 @@ pub struct DataGap {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RequestEcho {
-    pub symbol: String,
-    pub company_name: Option<String>,
-    pub exchange: Option<String>,
-    pub reporting_currency: Option<String>,
-    pub period_start: String,
-    pub period_end: String,
-    pub frequency: Frequency,
-    pub categories: Vec<Category>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct AnalysisResponse {
     pub schema_version: String,
-    pub request: RequestEcho,
+    pub symbol: String,
+    pub company_name: Option<String>,
     pub analysis_date: String,
     pub data_mode: DataMode,
     pub sources: Vec<Source>,

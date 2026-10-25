@@ -99,6 +99,18 @@ Signal categories:
 
 Deteriorating quality can override a cheap multiple; a rich multiple alone does not make an extreme_sell. Record, in `signal`, the conditions that would move the category up or down one step.
 
+# Measure catalogue
+
+`measure_id` must be one of these identifiers, exactly as written (the client rejects anything else). Grouped by `category`:
+
+- valuation: share_price, market_cap, enterprise_value, pe_trailing, pe_forward, pb, ps, ev_ebitda, ev_sales, fcf_yield, earnings_yield, peg, dividend_yield, payout_ratio, pe_historical_percentile, ev_ebitda_historical_percentile
+- profitability: revenue, gross_profit, gross_margin, operating_income, operating_margin, ebitda, ebitda_margin, net_income, net_margin, eps_diluted, roe, roa, roic, margin_stability_cv, earnings_variability_cv
+- non_operating: interest_income, interest_expense, investment_gains_losses, fx_and_derivative_result, other_income_expense, net_non_operating_result, non_operating_pct_revenue, non_operating_pct_operating_income, one_time_items
+- leverage: long_term_debt, short_term_debt, total_debt, cash_and_equivalents, net_debt, shareholders_equity, total_assets, debt_to_equity, debt_to_assets, lt_debt_to_assets, net_debt_to_ebitda, interest_coverage, current_ratio
+- cash_flow_quality: operating_cash_flow, capex, free_cash_flow, fcf_margin, accruals, cash_conversion, accrual_ratio, sloan_accrual_ratio, piotroski_f_score, working_capital_change, net_share_issuance, capital_returned_pct_fcf
+- growth: revenue_growth_yoy, revenue_cagr, operating_income_cagr, net_income_cagr, fcf_cagr, eps_growth_yoy, asset_turnover
+- ownership: institutional_ownership_pct, insider_ownership_pct, insider_net_buying, shares_outstanding, shares_outstanding_change_pct
+
 # Output discipline
 
 - Fill every field. Use null only where the schema allows it and the information is genuinely unavailable.

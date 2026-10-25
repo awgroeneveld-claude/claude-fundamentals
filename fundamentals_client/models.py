@@ -18,6 +18,8 @@ from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 
 class Strict(BaseModel):
@@ -43,6 +45,17 @@ class Category(str, Enum):
 
 
 class MeasureId(str, Enum):
+    """Catalogue of measure ids.
+
+    On the wire this is a plain string: an 80-value enum referenced from six places made the API's
+    structured-output grammar too large to compile. The catalogue is listed in the system prompt
+    instead, and membership is validated client-side when the response is parsed.
+    """
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler) -> JsonSchemaValue:  # noqa: ANN001
+        return {"type": "string", "description": "A measure id from the catalogue in the system prompt"}
+
     # 1.1 Valuation
     share_price = "share_price"
     market_cap = "market_cap"
@@ -411,20 +424,10 @@ class DataGap(Strict):
     description: str
 
 
-class RequestEcho(Strict):
-    symbol: str
-    company_name: str | None
-    exchange: str | None
-    reporting_currency: str | None
-    period_start: str
-    period_end: str
-    frequency: Frequency
-    categories: list[Category]
-
-
 class AnalysisResponse(Strict):
     schema_version: Literal["1.0"]
-    request: RequestEcho
+    symbol: str = Field(description="Symbol as given in the request")
+    company_name: str | None
     analysis_date: str = Field(description="ISO date the analysis was produced")
     data_mode: DataMode
     sources: list[Source]

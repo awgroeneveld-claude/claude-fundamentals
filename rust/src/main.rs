@@ -37,6 +37,9 @@ enum Cmd {
         /// Disable the server-side refusal fallback (beta)
         #[arg(long)]
         no_fallbacks: bool,
+        /// Do not send the schema as output_config.format; put it in the prompt and validate client-side
+        #[arg(long)]
+        no_schema_enforcement: bool,
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
@@ -51,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
             let resp: AnalysisResponse = serde_json::from_str(&text)?;
             println!(
                 "valid AnalysisResponse: {} signal={:?} reliability={}%",
-                resp.request.symbol, resp.signal.category, resp.overall_reliability_pct
+                resp.symbol, resp.signal.category, resp.overall_reliability_pct
             );
             for w in consistency_warnings(&resp) {
                 println!("  warning: {w}");
@@ -65,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
             effort,
             max_tokens,
             no_fallbacks,
+            no_schema_enforcement,
         } => {
             let text = std::fs::read_to_string(&request)
                 .with_context(|| format!("reading {}", request.display()))?;
@@ -75,6 +79,7 @@ async fn main() -> anyhow::Result<()> {
             cfg.effort = effort;
             cfg.max_tokens = max_tokens;
             cfg.use_server_fallbacks = !no_fallbacks;
+            cfg.enforce_schema = !no_schema_enforcement;
             let client = FundamentalsClient::new(cfg)?;
 
             let base_dir = request
@@ -115,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
             let u = &result.usage;
             eprintln!(
                 "\n{}: {:?} (conviction {}%, reliability {}%), overall reliability {}%, data_mode={:?}",
-                r.request.symbol, r.signal.category, r.signal.conviction_pct, r.signal.reliability_pct,
+                r.symbol, r.signal.category, r.signal.conviction_pct, r.signal.reliability_pct,
                 r.overall_reliability_pct, r.data_mode
             );
             eprintln!(

@@ -142,12 +142,8 @@ overall = int(round(statistics.fmean(p["reliability_pct"] for p in all_points)))
 
 resp = {
     "schema_version": "1.0",
-    "request": {
-        "symbol": req["symbol"], "company_name": req.get("company_name"), "exchange": req.get("exchange"),
-        "reporting_currency": req.get("reporting_currency"),
-        "period_start": req["period"]["start"], "period_end": req["period"]["end"],
-        "frequency": req["frequency"], "categories": req["categories"],
-    },
+    "symbol": req["symbol"],
+    "company_name": req.get("company_name"),
     "analysis_date": "2026-10-25",
     "data_mode": "supplied",
     "sources": [{
