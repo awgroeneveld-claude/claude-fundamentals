@@ -82,6 +82,10 @@ validation. The Python CLI has `--yaml` for that.
   GIF or WebP, 5 MB each, 100 per request; keep the long edge at or below 1568 px. See
   `examples/request_with_screenshots.json`. Screenshots are the practical route to IB's ownership
   and insider data, which the framework notes is hard to get by API.
+  Two traps the prompt handles: IB's fundamentals pages show LSEG data in USD millions whatever
+  the reporting currency (the model converts back or, better, uses the filing), and IB's market
+  cap for dual-class companies can cover only the listed class (Porsche SE's 3.776B is the
+  preference shares only). `examples/request_pah3.json` carries a real example screenshot.
 
 **Response** (`schema/analysis_response.schema.json`, enforced by the API). Top level:
 
