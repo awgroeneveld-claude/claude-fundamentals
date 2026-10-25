@@ -54,6 +54,10 @@ validation. The Python CLI has `--yaml` for that.
 }
 ```
 
+* Valuation multiples (P/E, P/B, P/S, EV/EBITDA, EV/Sales, FCF yield, dividend yield) come with a
+  year-by-year history: the price at each fiscal year-end over the trailing figures as of that date,
+  so their `trend` shows re-rating or de-rating and `pe_historical_percentile` places today's
+  multiple in that range. The report charts each multiple on its own axis.
 * `frequency` defaults to `both`, which is the framework's approach: annual series for every measure
   over the whole period (5-10 years), plus quarterly points for the most recent `recent_quarters`
   (default 8) on the core flow and balance measures (revenue, margins, net income, EPS, operating
@@ -236,14 +240,17 @@ export ANTHROPIC_API_KEY=...                # see "API key handling" below
 ./target/release/fundamentals analyze ../examples/request_supplied_data.json --effort medium
 ./target/release/fundamentals analyze ../examples/request_with_screenshots.json   # after dropping PNGs in examples/screenshots/
 ./target/release/fundamentals check ../out/asml.json     # re-validate + consistency warnings, offline
-./target/release/fundamentals analyze ../examples/request_vow3.json --out ../out/vow3.json --report
-./target/release/fundamentals report ../out/vow3.json    # Markdown + SVG charts from a saved JSON
-./target/release/fundamentals report ../out/vow3.json --charts mermaid --out ../out/vow3_mermaid.md
+./target/release/fundamentals analyze ../examples/request_volcar_b.json --out ../out/volcar_b.json --report
+./target/release/fundamentals report ../out/volcar_b.json    # Markdown + SVG charts from a saved JSON
+./target/release/fundamentals report ../out/volcar_b.json --charts mermaid --out ../out/volcar_b_mermaid.md
 ```
 
-`examples/request_vow3.json` is a full request for Volkswagen AG preference shares (XETRA: VOW3): all
-eight categories, a peer set, and notes that handle the two things that trip up automotive
-analysis, the ordinary/preference share split and the captive financial-services debt.
+`examples/request_volcar_b.json` is a full request for Volvo Car AB (Nasdaq Stockholm: VOLCAR B): all
+eight categories, annual plus eight quarters, signal history, a EUR base-currency view, and notes
+on the 2021 listing (no valuation before it), the Polestar equity-accounted results and impairments
+under non-operating items, and Geely's majority ownership. `examples/request_vow3.json` does the
+same for Volkswagen preference shares, with notes on the ordinary/preference split and the
+captive financial-services debt.
 
 ### Markdown report
 
@@ -381,7 +388,7 @@ schema/analysis_request.schema.json     request contract
 schema/analysis_response.schema.json    response contract exactly as sent to the API
 fundamentals_client/                    Python reference (models.py = schema source of truth, client.py, __main__.py CLI)
 rust/                                   Rust crate: models.rs, sse.rs, client.rs, checks.rs, report.rs, chart.rs, main.rs CLI, tests/offline.rs
-examples/                               five requests (ASML, AAPL quarterly, supplied data, screenshots, Volkswagen) + make_sample_response.py + sample_response.json
+examples/                               six requests (ASML, AAPL quarterly, supplied data, screenshots, Volkswagen, Volvo Cars) + make_sample_response.py + sample_response.json
 tests/                                  Python offline tests
 ```
 
