@@ -124,8 +124,10 @@ pub struct Config {
     pub use_server_fallbacks: bool,
     pub show_thinking_summary: bool,
     pub system_prompt: String,
-    /// true: send the schema as `output_config.format` (API-side grammar). false: append the schema
-    /// to the system prompt and rely on client-side validation (use if the API rejects the grammar).
+    /// false (default): the schema goes into the system prompt and the reply is validated
+    /// client-side. true: also send it as `output_config.format` so the API constrains decoding.
+    /// The API currently rejects this schema's grammar as too large; keep false until that is
+    /// resolved (see README).
     pub enforce_schema: bool,
     /// Optional progress sink; `stderr_progress()` prints to stderr. None = silent.
     pub progress: Option<ProgressSink>,
@@ -161,7 +163,7 @@ impl Config {
             use_server_fallbacks: true,
             show_thinking_summary: false,
             system_prompt: SYSTEM_PROMPT.into(),
-            enforce_schema: true,
+            enforce_schema: false,
             progress: None,
         })
     }

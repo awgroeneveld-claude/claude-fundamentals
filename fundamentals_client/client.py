@@ -161,12 +161,12 @@ class FundamentalsClient:
         system_prompt: str | None = None,
         use_server_fallbacks: bool = True,
         show_thinking_summary: bool = False,
-        enforce_schema: bool = True,
+        enforce_schema: bool = False,
         progress: Callable[[str], None] | None = None,
     ):
-        """`enforce_schema=False` drops `output_config.format` (API-side grammar) and instead appends the
-        schema to the system prompt; the reply is still validated client-side. Use it if the API
-        rejects the schema as too large to compile."""
+        """`enforce_schema=False` (default) puts the schema in the system prompt and validates the reply
+        client-side. `True` also sends it as `output_config.format` so the API constrains decoding;
+        the API currently rejects this schema's grammar as too large, see README."""
         self.client = client or anthropic.Anthropic()  # credentials from env / `ant auth login`
         self.model = model
         self.effort = effort

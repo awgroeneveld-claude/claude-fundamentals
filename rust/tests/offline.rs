@@ -269,3 +269,58 @@ fn base_currency_completeness_is_checked() {
     let w = consistency_warnings(&resp);
     assert!(w.iter().any(|x| x.contains("value_base is null")), "{w:?}");
 }
+
+#[test]
+fn report_renders_sample_with_charts() {
+    use fundamentals_client::{render_report, ChartMode, ReportOptions};
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let resp: AnalysisResponse = serde_json::from_str(&text).unwrap();
+    let rep = render_report(
+        &resp,
+        &ReportOptions {
+            charts: ChartMode::Svg,
+            chart_dir: "c".into(),
+            warnings: vec![],
+        },
+    );
+    let md = &rep.markdown;
+    assert!(md.starts_with("# Example Industries plc (EXMP): fundamental analysis"));
+    for h in [
+        "## Signal: SELL",
+        "## Pillar scorecard",
+        "## Trends:",
+        "## Measures",
+        "### Profitability",
+        "### Leverage",
+        "### Cash Flow Quality",
+        "## Sources",
+        "## Data gaps",
+    ] {
+        assert!(md.contains(h), "missing section {h}");
+    }
+    assert!(md.contains("GBP 2,150m"), "currency formatting");
+    assert!(md.contains("11.3 %"), "percent formatting");
+    assert!(!rep.charts.is_empty());
+    for (name, svg) in &rep.charts {
+        assert!(name.ends_with(".svg"));
+        assert!(svg.starts_with("<svg") && svg.ends_with("</svg>"));
+        assert!(
+            md.contains(&format!("](c/{name})")),
+            "chart {name} referenced"
+        );
+    }
+    // the unavailable measure (net debt / EBITDA) is not charted
+    assert!(!rep
+        .charts
+        .iter()
+        .any(|(n, _)| n.contains("net-debt-ebitda")));
+    let mermaid = render_report(
+        &resp,
+        &ReportOptions {
+            charts: ChartMode::Mermaid,
+            chart_dir: "c".into(),
+            warnings: vec![],
+        },
+    );
+    assert!(mermaid.charts.is_empty() && mermaid.markdown.contains("xychart-beta"));
+}

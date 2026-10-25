@@ -54,7 +54,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         model=args.model,
         effort=args.effort,
         max_tokens=args.max_tokens,
-        enforce_schema=not args.no_schema_enforcement,
+        enforce_schema=args.enforce_schema,
         progress=progress,
     )
     try:
@@ -114,9 +114,9 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"])
     a.add_argument("--max-tokens", type=int, default=64_000)
     a.add_argument(
-        "--no-schema-enforcement",
+        "--enforce-schema",
         action="store_true",
-        help="do not send the schema as output_config.format; put it in the prompt and validate client-side",
+        help="also send the schema as output_config.format (API-side grammar); off by default, see README",
     )
     a.add_argument("--quiet", action="store_true", help="suppress the progress log on stderr")
     a.set_defaults(fn=cmd_analyze)

@@ -171,19 +171,16 @@ Why each piece:
   reasoning, `medium` for cheaper screening runs.
 * **Streaming.** Thinking plus a large JSON document can take minutes; non-streaming requests risk
   HTTP timeouts. The Rust client parses the SSE events itself (`rust/src/sse.rs`).
-* **Structured outputs.** The checked-in schema is sent on every call. The first call with a new
-  schema pays a one-time compilation cost; after that it is cached for 24 h. The API compiles the
-  schema into a decoding grammar with hard limits: at most 16 union-typed fields (any `anyOf`,
-  which is what every nullable `X | null` becomes) and 24 optional fields per request, and unions
-  compile exponentially. The first live runs hit the limit (`400 The compiled grammar is too
-  large`). The schema is therefore built to a rule, enforced by tests in both languages: **only five
-  numeric fields are nullable** (a data point's `value`, the three trend statistics, a holder's
-  `pct_of_shares`); absent text is the empty string; `ownership` and `context` are always present
-  with a `requested` flag; `measure_id` is a plain string on the wire with the catalogue in the
-  prompt and membership checked client-side. If the limit is ever hit again, pass
-  `--no-schema-enforcement` (both CLIs; `enforce_schema=false` / `Config.enforce_schema`): the
-  schema then goes into the system prompt instead of `output_config.format`, and the reply is
-  validated client-side only.
+* **Schema: prompt-embedded by default, API-enforced as an option.** The checked-in JSON Schema is
+  appended to the system prompt and every reply is validated client-side against it (serde with
+  unknown fields rejected in Rust, Pydantic in Python). The first live run produced a 40 KB
+  response that parsed cleanly this way. Passing `--enforce-schema` (`enforce_schema=true`) also
+  sends the schema as `output_config.format`, which makes the API constrain decoding to it. That
+  path currently fails with `400 The compiled grammar is too large` even after the schema was
+  reduced to five nullable fields and no optional ones (the documented limits are 16 union-typed
+  and 24 optional fields, with undocumented internal size limits on top). Until that is resolved
+  with Anthropic support, keep the default. The schema is still kept within the documented
+  budget by tests in both languages so enforcement can be switched on without changes.
 * **Prompt caching.** The system prompt is ~2.5k tokens and byte-identical across calls, so it is
   marked for caching and the volatile request goes in the user message after it. Check
   `usage.cache_read_input_tokens` on the second call.
@@ -214,7 +211,41 @@ export ANTHROPIC_API_KEY=...                # see "API key handling" below
 ./target/release/fundamentals analyze ../examples/request_supplied_data.json --effort medium
 ./target/release/fundamentals analyze ../examples/request_with_screenshots.json   # after dropping PNGs in examples/screenshots/
 ./target/release/fundamentals check ../out/asml.json     # re-validate + consistency warnings, offline
+./target/release/fundamentals analyze ../examples/request_vow3.json --out ../out/vow3.json --report
+./target/release/fundamentals report ../out/vow3.json    # Markdown + SVG charts from a saved JSON
+./target/release/fundamentals report ../out/vow3.json --charts mermaid --out ../out/vow3_mermaid.md
 ```
+
+`examples/request_vow3.json` is a full request for Volkswagen AG preference shares (XETRA: VOW3): all
+eight categories, a peer set, and notes that handle the two things that trip up automotive
+analysis, the ordinary/preference share split and the captive financial-services debt.
+
+### Markdown report
+
+`fundamentals report <response.json>` (or `analyze --report`) renders the JSON as a Markdown
+document with charts:
+
+* signal with conviction and reliability, rationale, green and red flags, and the conditions that
+  would move it up or down;
+* pillar scorecard; trend summary with inflections and the operating vs non-operating split;
+* one table per category with latest value, period, trend direction, CAGR, year-on-year change,
+  position vs own history and peers, reliability and method, followed by the charts, followed by
+  collapsible per-measure series tables (value, base-currency value when requested, reliability,
+  method, source ids) and notes;
+* ownership and context when requested, currency notes and the FX table, sector adjustments, data
+  gaps, the source list with links, consistency warnings, and the disclaimer.
+
+Charts are static SVG files written to `<name>_charts/` next to the Markdown and referenced by
+relative path, so they render in any Markdown viewer, GitHub included. `--charts mermaid` embeds
+Mermaid `xychart-beta` blocks instead (single file; renders on GitHub, GitLab, Obsidian, VS Code),
+one chart per series since that chart type has no legend. `--charts none` omits them. Measures are
+grouped per chart by unit, at most four series per chart: all percentages of a category together,
+currency amounts with the same currency and scale together, ratios and multiples one per chart.
+Measures with fewer than two data points are not charted. Line charts only, one y-axis per chart,
+in the reporting currency; the base-currency view is in the series tables.
+
+For your own app the same is available as a library call: `render_report(&response,
+&ReportOptions { charts, chart_dir, warnings })` returns the Markdown and the chart files.
 
 Use it as a library in your app (`Cargo.toml`: `fundamentals-client = { path = "../claude-fundamentals/rust" }`):
 
@@ -324,17 +355,18 @@ prompts/system_prompt.md                the system prompt (framework + rubric + 
 schema/analysis_request.schema.json     request contract
 schema/analysis_response.schema.json    response contract exactly as sent to the API
 fundamentals_client/                    Python reference (models.py = schema source of truth, client.py, __main__.py CLI)
-rust/                                   Rust crate: models.rs, sse.rs, client.rs, checks.rs, main.rs CLI, tests/offline.rs
-examples/                               three requests + make_sample_response.py + sample_response.json
+rust/                                   Rust crate: models.rs, sse.rs, client.rs, checks.rs, report.rs, chart.rs, main.rs CLI, tests/offline.rs
+examples/                               five requests (ASML, AAPL quarterly, supplied data, screenshots, Volkswagen) + make_sample_response.py + sample_response.json
 tests/                                  Python offline tests
 ```
 
 ## 8. Status and open items
 
-Verified in this repository without an API key: both clients build, pass their offline tests, and
-produce byte-for-byte the intended request body (checked by capturing the Python SDK's outgoing
-request and asserting the Rust body against the same shape). **Not yet verified: a live call.**
-Expect at most prompt-level tuning after the first real runs, not structural changes.
+Verified live: the Rust CLI completed an ASML web-research run and produced a 40 KB response that
+parsed through the strict types, with the schema in the prompt rather than API-enforced. Verified
+offline: both clients pass their test suites and produce byte-for-byte the intended request body.
+**Open:** API-side schema enforcement fails on grammar size (see "How the call is made"); the
+report renderer has been exercised on the hand-built sample, not yet on a live response.
 
 Open decisions for you:
 

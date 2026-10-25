@@ -34,7 +34,10 @@ def test_response_schema_is_structured_outputs_compatible():
         assert banned not in dumped, f"{banned} must be stripped before sending"
 
 
-@pytest.mark.parametrize("name", ["request_asml.json", "request_subset_quarterly.json", "request_supplied_data.json"])
+@pytest.mark.parametrize(
+    "name",
+    ["request_asml.json", "request_subset_quarterly.json", "request_supplied_data.json", "request_vow3.json", "request_with_screenshots.json"],
+)
 def test_example_requests_validate(name):
     req = AnalysisRequest.model_validate_json((ROOT / "examples" / name).read_text())
     msg = build_user_message(req, "2026-10-25")

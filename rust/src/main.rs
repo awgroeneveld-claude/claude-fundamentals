@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use fundamentals_client::{
-    consistency_warnings, AnalysisRequest, AnalysisResponse, Config, Error, FundamentalsClient,
+    consistency_warnings, render_report, AnalysisRequest, AnalysisResponse, ChartMode, Config,
+    Error, FundamentalsClient, ReportOptions,
 };
 
 #[derive(Parser)]
@@ -37,15 +38,77 @@ enum Cmd {
         /// Disable the server-side refusal fallback (beta)
         #[arg(long)]
         no_fallbacks: bool,
-        /// Do not send the schema as output_config.format; put it in the prompt and validate client-side
+        /// Also send the schema as output_config.format (API-side grammar). Off by default: the API
+        /// currently rejects this schema's grammar as too large.
         #[arg(long)]
-        no_schema_enforcement: bool,
+        enforce_schema: bool,
+        /// Also write a Markdown report (with SVG charts) next to --out
+        #[arg(long)]
+        report: bool,
         /// Suppress the progress log on stderr
         #[arg(long)]
         quiet: bool,
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
+    /// Render a saved response as a Markdown report with charts (offline)
+    Report {
+        /// AnalysisResponse JSON file
+        file: PathBuf,
+        /// Markdown output path (default: same name with .md)
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// svg: chart files next to the report; mermaid: embedded blocks; none
+        #[arg(long, default_value = "svg", value_parser = ["svg", "mermaid", "none"])]
+        charts: String,
+    },
+}
+
+fn write_report(
+    resp: &AnalysisResponse,
+    md_path: &std::path::Path,
+    charts: ChartMode,
+) -> anyhow::Result<()> {
+    let stem = md_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("report")
+        .to_string();
+    let chart_dir_name = format!("{stem}_charts");
+    let opts = ReportOptions {
+        charts,
+        chart_dir: chart_dir_name.clone(),
+        warnings: consistency_warnings(resp),
+    };
+    let report = render_report(resp, &opts);
+    if let Some(dir) = md_path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(md_path, &report.markdown)?;
+    if !report.charts.is_empty() {
+        let dir = md_path
+            .parent()
+            .map(|d| d.join(&chart_dir_name))
+            .unwrap_or_else(|| chart_dir_name.clone().into());
+        std::fs::create_dir_all(&dir)?;
+        for (name, svg) in &report.charts {
+            std::fs::write(dir.join(name), svg)?;
+        }
+    }
+    println!(
+        "wrote {} ({} charts)",
+        md_path.display(),
+        report.charts.len()
+    );
+    Ok(())
+}
+
+fn chart_mode(s: &str) -> ChartMode {
+    match s {
+        "mermaid" => ChartMode::Mermaid,
+        "none" => ChartMode::None,
+        _ => ChartMode::Svg,
+    }
 }
 
 #[tokio::main]
@@ -64,6 +127,13 @@ async fn main() -> anyhow::Result<()> {
             }
             Ok(())
         }
+        Cmd::Report { file, out, charts } => {
+            let text = std::fs::read_to_string(&file)
+                .with_context(|| format!("reading {}", file.display()))?;
+            let resp: AnalysisResponse = serde_json::from_str(&text)?;
+            let md_path = out.unwrap_or_else(|| file.with_extension("md"));
+            write_report(&resp, &md_path, chart_mode(&charts))
+        }
         Cmd::Analyze {
             request,
             out,
@@ -71,7 +141,8 @@ async fn main() -> anyhow::Result<()> {
             effort,
             max_tokens,
             no_fallbacks,
-            no_schema_enforcement,
+            enforce_schema,
+            report,
             quiet,
         } => {
             let text = std::fs::read_to_string(&request)
@@ -83,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
             cfg.effort = effort;
             cfg.max_tokens = max_tokens;
             cfg.use_server_fallbacks = !no_fallbacks;
-            cfg.enforce_schema = !no_schema_enforcement;
+            cfg.enforce_schema = enforce_schema;
             if !quiet {
                 cfg.progress = Some(fundamentals_client::stderr_progress());
                 eprintln!(
@@ -124,6 +195,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                     std::fs::write(p, format!("{}\n", result.raw_json))?;
                     println!("wrote {}", p.display());
+                    if report {
+                        write_report(&result.response, &p.with_extension("md"), ChartMode::Svg)?;
+                    }
                 }
                 None => println!("{}", result.raw_json),
             }
