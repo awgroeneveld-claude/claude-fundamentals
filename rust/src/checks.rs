@@ -191,6 +191,39 @@ pub fn consistency_warnings(r: &AnalysisResponse) -> Vec<String> {
         }
     }
 
+    // Signal history: chronological, extremes only with valuation assessed, last point consistent.
+    if r.signal_history
+        .windows(2)
+        .any(|p| p[0].period_end > p[1].period_end)
+    {
+        w.push("signal_history not chronological".to_string());
+    }
+    for sp in &r.signal_history {
+        if matches!(sp.category, Signal::ExtremeBuy | Signal::ExtremeSell) && !sp.valuation_assessed
+        {
+            w.push(format!(
+                "signal_history {}: {:?} without valuation assessed",
+                sp.period_end, sp.category
+            ));
+        }
+        for sid in &sp.source_ids {
+            if !source_ids.contains(sid.as_str()) {
+                w.push(format!(
+                    "signal_history {}: unknown source id {sid}",
+                    sp.period_end
+                ));
+            }
+        }
+    }
+    if let Some(last) = r.signal_history.last() {
+        if last.reliability_pct > r.signal.reliability_pct.saturating_add(10) {
+            w.push(
+                "signal_history last point is rated more reliable than the current signal"
+                    .to_string(),
+            );
+        }
+    }
+
     if r.data_mode == DataMode::RecallOnly {
         let too_high: Vec<String> = r
             .measures

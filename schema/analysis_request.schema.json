@@ -240,6 +240,12 @@
       "description": "Raw financial-statement data from your own provider (any JSON shape; describe units/periods inside it). When present, it is the preferred source.",
       "title": "Supplied Data"
     },
+    "signal_history": {
+      "default": true,
+      "description": "Also evaluate the framework as of each fiscal year-end in the period (point-in-time, no look-ahead), producing a buy/hold/sell series.",
+      "title": "Signal History",
+      "type": "boolean"
+    },
     "images": {
       "description": "Screenshots to read figures from; sent as image blocks, not inside the JSON payload.",
       "items": {

@@ -119,7 +119,7 @@ fn request_body_matches_python_reference_shape() {
             .as_array()
             .unwrap()
             .len(),
-        18
+        19
     );
     // MeasureId must be a plain string on the wire (grammar size), enum-validated client-side.
     let defs = &body["output_config"]["format"]["schema"]["$defs"];
@@ -422,4 +422,40 @@ fn quarterly_points_get_their_own_chart() {
         .unwrap();
     assert_eq!(q.matches("<circle").count(), 4);
     assert!(q.contains("Q 2024-12"));
+}
+
+#[test]
+fn signal_history_is_checked_and_charted() {
+    use fundamentals_client::{render_report, ChartMode, ReportOptions};
+    let text = std::fs::read_to_string(root().join("examples/sample_response.json")).unwrap();
+    let resp: AnalysisResponse = serde_json::from_str(&text).unwrap();
+    assert_eq!(resp.signal_history.len(), 4);
+    let rep = render_report(
+        &resp,
+        &ReportOptions {
+            charts: ChartMode::Svg,
+            chart_dir: "c".into(),
+            warnings: vec![],
+        },
+    );
+    let names: Vec<&str> = rep.charts.iter().map(|(n, _)| n.as_str()).collect();
+    assert!(
+        names.contains(&"signal-over-time.svg") && names.contains(&"pillar-scores-over-time.svg"),
+        "{names:?}"
+    );
+    assert!(
+        !names.contains(&"valuation-pillar-over-time.svg"),
+        "valuation never assessed in sample"
+    );
+
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    v["signal_history"][0]["category"] = json!("extreme_sell");
+    v["signal_history"][0]["period_end"] = json!("2025-01-01");
+    let bad: AnalysisResponse = serde_json::from_value(v).unwrap();
+    let w = consistency_warnings(&bad);
+    assert!(
+        w.iter().any(|x| x.contains("without valuation assessed")),
+        "{w:?}"
+    );
+    assert!(w.iter().any(|x| x.contains("not chronological")), "{w:?}");
 }

@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use crate::chart::{fmt_num, line_chart_svg, mermaid_blocks, ChartSpec, Series, MAX_SERIES};
 use crate::models::{
     AnalysisResponse, Assessment, Category, DataPoint, Direction, Measure, PeriodType, Scale,
-    Signal, Unit,
+    Signal, SignalPoint, Unit,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,6 +154,26 @@ fn direction_word(d: Direction) -> &'static str {
     }
 }
 
+fn signal_score(s: Signal) -> f64 {
+    match s {
+        Signal::ExtremeSell => -2.0,
+        Signal::Sell => -1.0,
+        Signal::Hold => 0.0,
+        Signal::Buy => 1.0,
+        Signal::ExtremeBuy => 2.0,
+    }
+}
+
+fn sp_label(sp: &SignalPoint) -> String {
+    let year = sp.period_end.get(0..4).unwrap_or(&sp.period_end);
+    match sp.period_type {
+        PeriodType::FY => format!("FY{year}"),
+        PeriodType::TTM => format!("TTM {}", sp.period_end.get(0..7).unwrap_or(&sp.period_end)),
+        PeriodType::Q => format!("Q {}", sp.period_end.get(0..7).unwrap_or(&sp.period_end)),
+        _ => sp.period_end.clone(),
+    }
+}
+
 fn opt_pct(v: Option<f64>) -> String {
     v.map(|x| format!("{} %", fmt_num(x)))
         .unwrap_or_else(|| "n/a".into())
@@ -246,6 +266,8 @@ fn spec_for(title: &str, group: &[&Measure], quarterly: bool) -> Option<ChartSpe
         unit_label: unit,
         categories: periods.into_iter().map(|(_, l)| l).collect(),
         series,
+        y_labels: vec![],
+        step: false,
     })
 }
 
@@ -333,6 +355,140 @@ pub fn render(r: &AnalysisResponse, opts: &ReportOptions) -> Report {
         );
     }
     md.push('\n');
+
+    // ---- Signal history
+    if !r.signal_history.is_empty() {
+        let _ = writeln!(md, "## Signal over time\n");
+        let _ = writeln!(md, "The framework applied as of each date with only the figures available then (no look-ahead). Pillar scores 0-100, 100 = most favourable; valuation shown as – and extremes unavailable where no price could be sourced for the date.\n");
+        let _ = writeln!(md, "| As of | Signal | Conviction | Reliability | Valuation | Profitability | Debt | Earnings quality | Trends | Decisive factor |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---|");
+        for sp in &r.signal_history {
+            let ps = &sp.pillar_scores;
+            let _ = writeln!(
+                md,
+                "| {} | {} | {} % | {} % | {} | {} | {} | {} | {} | {} |",
+                sp_label(sp),
+                signal_word(sp.category),
+                sp.conviction_pct,
+                sp.reliability_pct,
+                if sp.valuation_assessed {
+                    ps.valuation.to_string()
+                } else {
+                    "–".to_string()
+                },
+                ps.profitability_stability,
+                ps.debt_health,
+                ps.earnings_quality,
+                ps.trends,
+                md_cell(&sp.decisive_factor)
+            );
+        }
+        md.push('\n');
+        if opts.charts != ChartMode::None {
+            let cats: Vec<String> = r.signal_history.iter().map(sp_label).collect();
+            let col = |f: &dyn Fn(&SignalPoint) -> f64| -> Vec<Option<f64>> {
+                r.signal_history.iter().map(|sp| Some(f(sp))).collect()
+            };
+            let mut specs = vec![
+                ChartSpec {
+                    title: "Signal over time".into(),
+                    unit_label: "framework category".into(),
+                    categories: cats.clone(),
+                    series: vec![Series {
+                        name: "Signal".into(),
+                        points: col(&|sp| signal_score(sp.category)),
+                    }],
+                    y_labels: vec![
+                        (-2.0, "Extreme sell".into()),
+                        (-1.0, "Sell".into()),
+                        (0.0, "Hold".into()),
+                        (1.0, "Buy".into()),
+                        (2.0, "Extreme buy".into()),
+                    ],
+                    step: true,
+                },
+                ChartSpec {
+                    title: "Conviction and reliability over time".into(),
+                    unit_label: "percent".into(),
+                    categories: cats.clone(),
+                    series: vec![
+                        Series {
+                            name: "Conviction".into(),
+                            points: col(&|sp| sp.conviction_pct as f64),
+                        },
+                        Series {
+                            name: "Reliability".into(),
+                            points: col(&|sp| sp.reliability_pct as f64),
+                        },
+                    ],
+                    y_labels: vec![],
+                    step: false,
+                },
+                ChartSpec {
+                    title: "Pillar scores over time".into(),
+                    unit_label: "score (0-100)".into(),
+                    categories: cats.clone(),
+                    series: vec![
+                        Series {
+                            name: "Profitability".into(),
+                            points: col(&|sp| sp.pillar_scores.profitability_stability as f64),
+                        },
+                        Series {
+                            name: "Debt health".into(),
+                            points: col(&|sp| sp.pillar_scores.debt_health as f64),
+                        },
+                        Series {
+                            name: "Earnings quality".into(),
+                            points: col(&|sp| sp.pillar_scores.earnings_quality as f64),
+                        },
+                        Series {
+                            name: "Trends".into(),
+                            points: col(&|sp| sp.pillar_scores.trends as f64),
+                        },
+                    ],
+                    y_labels: vec![],
+                    step: false,
+                },
+            ];
+            let valuation_pts: Vec<Option<f64>> = r
+                .signal_history
+                .iter()
+                .map(|sp| {
+                    sp.valuation_assessed
+                        .then_some(sp.pillar_scores.valuation as f64)
+                })
+                .collect();
+            if valuation_pts.iter().flatten().count() >= 2 {
+                specs.push(ChartSpec {
+                    title: "Valuation pillar over time".into(),
+                    unit_label: "score (0-100)".into(),
+                    categories: cats,
+                    series: vec![Series {
+                        name: "Valuation".into(),
+                        points: valuation_pts,
+                    }],
+                    y_labels: vec![],
+                    step: false,
+                });
+            }
+            for spec in specs {
+                match opts.charts {
+                    ChartMode::Svg => {
+                        let file = format!("{}.svg", slug(&spec.title));
+                        let _ = writeln!(
+                            md,
+                            "![{}]({}/{})\n",
+                            spec.title,
+                            opts.chart_dir.trim_end_matches('/'),
+                            file
+                        );
+                        charts.push((file, line_chart_svg(&spec)));
+                    }
+                    ChartMode::Mermaid => md.push_str(&mermaid_blocks(&spec)),
+                    ChartMode::None => {}
+                }
+            }
+        }
+    }
 
     // ---- Pillars
     let _ = writeln!(md, "## Pillar scorecard\n");

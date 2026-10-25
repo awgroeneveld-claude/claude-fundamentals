@@ -12,7 +12,8 @@ Usage from your app:
 
 Design notes
 ------------
-* Model: claude-opus-5-5, adaptive thinking (always on for this model), effort set explicitly.
+* Model: claude-sonnet-5-5 by default (half the price of Opus 5.5; adaptive thinking on, effort set
+  explicitly); pass model="claude-opus-5-5" for the hardest names.
 * Structured outputs: the Pydantic `AnalysisResponse` is passed as `output_format`; the API
   constrains generation to its JSON Schema, the SDK validates and parses it (`parsed_output`).
 * Streaming: large outputs + thinking make non-streaming requests prone to HTTP timeouts.
@@ -37,7 +38,7 @@ import anthropic
 
 from .models import AnalysisRequest, AnalysisResponse
 
-DEFAULT_MODEL = "claude-opus-5-5"
+DEFAULT_MODEL = "claude-sonnet-5-5"  # user's choice; claude-opus-5-5 for the hardest names
 DEFAULT_EFFORT = "high"  # Opus 5.5 defaults to "medium"; set explicitly. low|medium|high|xhigh|max
 DEFAULT_MAX_TOKENS = 64_000  # thinking + JSON; streaming so timeouts are not a concern
 MAX_PAUSE_RESUMES = 6
@@ -395,6 +396,19 @@ def consistency_warnings(r: AnalysisResponse) -> list[str]:
         for sid in fr.source_ids:
             if sid not in source_ids:
                 w.append(f"fx rate {fr.period_end}: unknown source id {sid}")
+
+    # Signal history: chronological, extremes only with valuation assessed, last point consistent with signal.
+    ends = [sp.period_end for sp in r.signal_history]
+    if ends != sorted(ends):
+        w.append("signal_history not chronological")
+    for sp in r.signal_history:
+        if sp.category.value in ("extreme_buy", "extreme_sell") and not sp.valuation_assessed:
+            w.append(f"signal_history {sp.period_end}: {sp.category.value} without valuation assessed")
+        for sid in sp.source_ids:
+            if sid not in source_ids:
+                w.append(f"signal_history {sp.period_end}: unknown source id {sid}")
+    if r.signal_history and r.signal_history[-1].reliability_pct > r.signal.reliability_pct + 10:
+        w.append("signal_history last point is rated more reliable than the current signal")
 
     if r.data_mode.value == "recall_only":
         too_high = [m.measure_id.value for m in r.measures if m.reliability_pct > 35]

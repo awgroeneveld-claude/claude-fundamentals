@@ -3,7 +3,7 @@
 //! Wire shape is identical to the Python reference implementation:
 //!   * `POST {base_url}/v1/messages`, headers `x-api-key`, `anthropic-version: 2026-10-21`,
 //!     `anthropic-beta: server-side-fallback-2026-07-01` (for `"fallbacks": "default"`).
-//!   * `model: claude-opus-5-5`, adaptive thinking (always on for this model), explicit `effort`.
+//!   * `model: claude-sonnet-5-5` by default (Opus 5.5 via `--model`), adaptive thinking, explicit `effort`.
 //!   * Structured outputs: `output_config.format = {type: json_schema, schema: <response schema>}`.
 //!   * Streaming (`stream: true`) because thinking + a large JSON document can take minutes.
 //!   * Server tools `web_search_20260209` / `web_fetch_20260209` when `allow_web_research`.
@@ -25,7 +25,7 @@ use crate::models::{validate_ranges, AnalysisRequest, AnalysisResponse, ImageAtt
 use crate::sse::{Message, MessageAccumulator, Progress, SseParser, StreamError};
 use std::sync::Arc;
 
-pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
+pub const DEFAULT_MODEL: &str = "claude-sonnet-5-5"; // user's choice; claude-opus-5-5 for the hardest names
 pub const DEFAULT_EFFORT: &str = "high"; // Opus 5.5 defaults to "medium"; set explicitly
 pub const DEFAULT_MAX_TOKENS: u32 = 64_000;
 pub const API_VERSION: &str = "2026-10-21";

@@ -291,6 +291,9 @@ pub struct AnalysisRequest {
     pub allow_web_research: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplied_data: Option<Value>,
+    /// Also evaluate the framework as of each fiscal year-end in the period (point-in-time).
+    #[serde(default = "default_true")]
+    pub signal_history: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<ImageAttachment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -344,6 +347,7 @@ impl AnalysisRequest {
             sector_hint: None,
             allow_web_research: true,
             supplied_data: None,
+            signal_history: true,
             images: vec![],
             notes: None,
         }
@@ -519,6 +523,33 @@ pub struct SignalBlock {
     pub conditions_for_downgrade: Vec<String>,
 }
 
+/// Point-in-time pillar scores, 0-100 (100 = most favourable).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PillarScores {
+    pub valuation: u8,
+    pub profitability_stability: u8,
+    pub debt_health: u8,
+    pub earnings_quality: u8,
+    pub trends: u8,
+}
+
+/// The framework applied as of `period_end`, using only information available at that date.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalPoint {
+    pub period_end: String,
+    pub period_type: PeriodType,
+    pub category: Signal,
+    pub conviction_pct: u8,
+    pub reliability_pct: u8,
+    /// false when no price / multiples existed for that date; extreme categories then unavailable.
+    pub valuation_assessed: bool,
+    pub pillar_scores: PillarScores,
+    pub decisive_factor: String,
+    pub source_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DataGap {
@@ -543,6 +574,10 @@ pub struct AnalysisResponse {
     pub pillars: Vec<Pillar>,
     pub trend_summary: TrendSummary,
     pub signal: SignalBlock,
+    /// Chronological, one point per fiscal year-end (plus latest TTM/quarter); empty when not requested.
+    /// Defaults to empty when absent (result files from before this field).
+    #[serde(default)]
+    pub signal_history: Vec<SignalPoint>,
     /// Reporting currency, listing currency and the FX rate used for price-side conversion, or "no conversion".
     /// Defaults to empty when absent (result files from before this field).
     #[serde(default)]
@@ -594,6 +629,34 @@ pub fn validate_ranges(r: &AnalysisResponse) -> Vec<String> {
             &format!("pillar {:?} score", p.pillar),
             &mut errs,
         );
+    }
+    for sp in &r.signal_history {
+        chk(
+            sp.conviction_pct,
+            &format!("signal_history {} conviction", sp.period_end),
+            &mut errs,
+        );
+        chk(
+            sp.reliability_pct,
+            &format!("signal_history {} reliability", sp.period_end),
+            &mut errs,
+        );
+        for (n, v) in [
+            ("valuation", sp.pillar_scores.valuation),
+            (
+                "profitability_stability",
+                sp.pillar_scores.profitability_stability,
+            ),
+            ("debt_health", sp.pillar_scores.debt_health),
+            ("earnings_quality", sp.pillar_scores.earnings_quality),
+            ("trends", sp.pillar_scores.trends),
+        ] {
+            chk(
+                v,
+                &format!("signal_history {} {n}", sp.period_end),
+                &mut errs,
+            );
+        }
     }
     chk(r.signal.conviction_pct, "signal.conviction_pct", &mut errs);
     chk(

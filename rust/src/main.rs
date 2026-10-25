@@ -1,4 +1,4 @@
-//! CLI: fundamentals analyze <request.json> [--out out.json] [--effort high] [--model claude-opus-5-5]
+//! CLI: fundamentals analyze <request.json> [--out out.json] [--effort high] [--model claude-sonnet-5-5]
 //!      fundamentals check <response.json>
 
 use std::path::PathBuf;

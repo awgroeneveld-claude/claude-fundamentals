@@ -33,11 +33,17 @@ pub struct ChartSpec {
     pub unit_label: String,
     pub categories: Vec<String>,
     pub series: Vec<Series>,
+    /// When non-empty, these (value, label) pairs replace the computed numeric ticks; the axis
+    /// spans exactly their range. Used for ordinal scales such as the signal categories.
+    pub y_labels: Vec<(f64, String)>,
+    /// Draw horizontal steps between points instead of straight segments (ordinal series).
+    pub step: bool,
 }
 
 const W: f64 = 760.0;
 const H: f64 = 320.0;
-const ML: f64 = 64.0;
+const ML_NUM: f64 = 64.0;
+const ML_ORD: f64 = 104.0;
 const MR: f64 = 72.0; // room for direct end labels
 const MT: f64 = 44.0;
 const MB_BASE: f64 = 40.0;
@@ -147,16 +153,35 @@ pub fn line_chart_svg(spec: &ChartSpec) -> String {
     if vmax < 0.0 && vmax > 0.5 * vmin {
         vmax = 0.0;
     }
-    let (lo, hi, step) = nice_ticks(vmin, vmax, 5);
+    let (lo, hi, step) = if spec.y_labels.is_empty() {
+        nice_ticks(vmin, vmax, 5)
+    } else {
+        let lo = spec
+            .y_labels
+            .iter()
+            .map(|(v, _)| *v)
+            .fold(f64::INFINITY, f64::min);
+        let hi = spec
+            .y_labels
+            .iter()
+            .map(|(v, _)| *v)
+            .fold(f64::NEG_INFINITY, f64::max);
+        (lo, hi, 1.0)
+    };
     let legend = series.len() >= 2;
     let mb = MB_BASE + if legend { LEGEND_H } else { 0.0 };
-    let plot_w = W - ML - MR;
+    let ml = if spec.y_labels.is_empty() {
+        ML_NUM
+    } else {
+        ML_ORD
+    };
+    let plot_w = W - ml - MR;
     let plot_h = H - MT - mb;
     let x = |i: usize| -> f64 {
         if n_cat == 1 {
-            ML + plot_w / 2.0
+            ml + plot_w / 2.0
         } else {
-            ML + plot_w * i as f64 / (n_cat - 1) as f64
+            ml + plot_w * i as f64 / (n_cat - 1) as f64
         }
     };
     let y = |v: f64| -> f64 { MT + plot_h - (v - lo) / (hi - lo) * plot_h };
@@ -173,36 +198,43 @@ pub fn line_chart_svg(spec: &ChartSpec) -> String {
     );
     let _ = write!(
         svg,
-        "<text x=\"{ML}\" y=\"20\" font-size=\"14\" font-weight=\"600\" fill=\"{INK_PRIMARY}\">{}</text>",
+        "<text x=\"{ml}\" y=\"20\" font-size=\"14\" font-weight=\"600\" fill=\"{INK_PRIMARY}\">{}</text>",
         esc(&spec.title)
     );
     let _ = write!(
         svg,
-        "<text x=\"{ML}\" y=\"35\" font-size=\"11\" fill=\"{INK_MUTED}\">{}</text>",
+        "<text x=\"{ml}\" y=\"35\" font-size=\"11\" fill=\"{INK_MUTED}\">{}</text>",
         esc(&spec.unit_label)
     );
 
-    // Gridlines and y ticks.
-    let mut t = lo;
-    let mut guard = 0;
-    while t <= hi + step * 1e-9 && guard < 50 {
-        let yy = y(t);
-        let is_zero = t.abs() < step * 1e-9;
+    // Gridlines and y ticks (numeric, or the ordinal labels supplied by the spec).
+    let ticks: Vec<(f64, String)> = if spec.y_labels.is_empty() {
+        let mut v = Vec::new();
+        let mut t = lo;
+        while t <= hi + step * 1e-9 && v.len() < 50 {
+            v.push((t, fmt_num(t)));
+            t += step;
+        }
+        v
+    } else {
+        spec.y_labels.clone()
+    };
+    for (t, label) in &ticks {
+        let yy = y(*t);
+        let is_zero = spec.y_labels.is_empty() && t.abs() < step * 1e-9;
         let _ = write!(
             svg,
-            "<line x1=\"{ML}\" x2=\"{:.1}\" y1=\"{yy:.1}\" y2=\"{yy:.1}\" stroke=\"{}\" stroke-width=\"1\"/>",
+            "<line x1=\"{ml}\" x2=\"{:.1}\" y1=\"{yy:.1}\" y2=\"{yy:.1}\" stroke=\"{}\" stroke-width=\"1\"/>",
             W - MR,
             if is_zero { BASELINE } else { GRIDLINE }
         );
         let _ = write!(
             svg,
             "<text x=\"{:.1}\" y=\"{:.1}\" font-size=\"11\" fill=\"{INK_MUTED}\" text-anchor=\"end\" style=\"font-variant-numeric: tabular-nums\">{}</text>",
-            ML - 8.0,
+            ml - 8.0,
             yy + 4.0,
-            esc(&fmt_num(t))
+            esc(label)
         );
-        t += step;
-        guard += 1;
     }
     // X labels (thin out when crowded).
     let every = (n_cat as f64 / 10.0).ceil().max(1.0) as usize;
@@ -234,10 +266,22 @@ pub fn line_chart_svg(spec: &ChartSpec) -> String {
             }
             run.clear();
         };
+        let mut prev: Option<f64> = None;
         for (i, p) in s.points.iter().enumerate().take(n_cat) {
             match p {
-                Some(v) => run.push(format!("{:.1},{:.1}", x(i), y(*v))),
-                None => flush(&mut run, &mut svg),
+                Some(v) => {
+                    if spec.step {
+                        if let Some(pv) = prev {
+                            run.push(format!("{:.1},{:.1}", x(i), y(pv)));
+                        }
+                    }
+                    run.push(format!("{:.1},{:.1}", x(i), y(*v)));
+                    prev = Some(*v);
+                }
+                None => {
+                    flush(&mut run, &mut svg);
+                    prev = None;
+                }
             }
         }
         flush(&mut run, &mut svg);
@@ -255,7 +299,13 @@ pub fn line_chart_svg(spec: &ChartSpec) -> String {
         }
         if let Some((i, v)) = last {
             // Value only: with a legend the colour swatch carries identity; without one the title does.
-            end_labels.push((y(v), fmt_num(v), i));
+            let label = spec
+                .y_labels
+                .iter()
+                .find(|(t, _)| (t - v).abs() < 1e-9)
+                .map(|(_, l)| l.clone())
+                .unwrap_or_else(|| fmt_num(v));
+            end_labels.push((y(v), label, i));
         }
     }
     // Push overlapping end labels apart.
@@ -275,7 +325,7 @@ pub fn line_chart_svg(spec: &ChartSpec) -> String {
         );
     }
     if legend {
-        let mut lx = ML;
+        let mut lx = ml;
         let ly = H - 10.0;
         for (si, s) in series.iter().enumerate() {
             let _ = write!(
@@ -362,6 +412,8 @@ mod tests {
                     points: vec![Some(8.3), Some(8.0), Some(6.5)],
                 },
             ],
+            y_labels: vec![],
+            step: false,
         };
         let svg = line_chart_svg(&spec);
         assert!(svg.starts_with("<svg") && svg.ends_with("</svg>"));
@@ -370,6 +422,42 @@ mod tests {
         assert_eq!(svg.matches("<polyline").count(), 1);
         assert_eq!(svg.matches("<rect").count(), 3); // surface + 2 legend swatches
         assert!(svg.contains(">6.5<"));
+    }
+
+    #[test]
+    fn ordinal_step_chart() {
+        let spec = ChartSpec {
+            title: "Signal".into(),
+            unit_label: "category".into(),
+            categories: vec!["FY2022".into(), "FY2023".into(), "FY2024".into()],
+            series: vec![Series {
+                name: "Signal".into(),
+                points: vec![Some(0.0), Some(-1.0), Some(-1.0)],
+            }],
+            y_labels: vec![
+                (-2.0, "Extreme sell".into()),
+                (-1.0, "Sell".into()),
+                (0.0, "Hold".into()),
+                (1.0, "Buy".into()),
+                (2.0, "Extreme buy".into()),
+            ],
+            step: true,
+        };
+        let svg = line_chart_svg(&spec);
+        assert!(svg.contains(">Extreme sell<") && svg.contains(">Extreme buy<"));
+        assert!(
+            !svg.contains(">-2<"),
+            "numeric ticks must be replaced by labels"
+        );
+        assert!(svg.contains(">Sell<"), "end label uses the category name");
+        let pts = svg
+            .split("points=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        assert_eq!(pts.split(' ').count(), 5);
     }
 
     #[test]
@@ -382,6 +470,8 @@ mod tests {
                 name: "Revenue".into(),
                 points: vec![Some(1.0), Some(2.0)],
             }],
+            y_labels: vec![],
+            step: false,
         };
         let m = mermaid_blocks(&spec);
         assert_eq!(m.matches("xychart-beta").count(), 1);

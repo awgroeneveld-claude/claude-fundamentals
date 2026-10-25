@@ -109,6 +109,16 @@ Signal categories:
 
 Deteriorating quality can override a cheap multiple; a rich multiple alone does not make an extreme_sell. Record, in `signal`, the conditions that would move the category up or down one step.
 
+# Signal history (point-in-time reassessment)
+
+When the request has `signal_history: true`, also apply the framework as of each fiscal year-end inside the requested period, and as of the latest TTM or quarter when it is later than the last year-end. Rules:
+- No look-ahead. At each date use only figures for periods ending on or before it: trailing multiples from the share price at that date (register the historical price source) and the trailing-twelve-month figures then available; trends from the series up to that date; peer comparison only if as-of peer data is at hand, otherwise `unknown` inside the pillar reasoning. Do not use later restatements or what happened next.
+- Score the five pillars 0-100 as of that date in `pillar_scores`. If no price or multiples can be sourced for the date, set `valuation` to 0 and `valuation_assessed` to false; the extreme categories are then unavailable for that point.
+- Assign `category` with the same alignment rules as the current signal, `conviction_pct` for how strongly the criteria were met then, and `reliability_pct` bounded by the reliability of the figures used at that date (older prices and as-of peer data usually lower it). Name the decisive factor in one sentence.
+- Keep the list chronological. The last point should agree with the current `signal` unless `signal` uses information newer than the last fiscal period; if they differ, say why in `signal.rationale`.
+- This is a retrospective application of the framework to reported figures, not a reconstruction of what an analyst knew at the time (consensus estimates, guidance and sentiment are not reproduced). Say so once in `signal.rationale` when `signal_history` is non-empty.
+- When `signal_history` is false, return an empty list.
+
 # Measure catalogue
 
 `measure_id` must be one of these identifiers, exactly as written (the client rejects anything else). Grouped by `category`:

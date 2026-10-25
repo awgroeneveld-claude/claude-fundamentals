@@ -311,6 +311,11 @@ class AnalysisRequest(Strict):
         description="Raw financial-statement data from your own provider (any JSON shape; "
         "describe units/periods inside it). When present, it is the preferred source.",
     )
+    signal_history: bool = Field(
+        default=True,
+        description="Also evaluate the framework as of each fiscal year-end in the period (point-in-time, "
+        "no look-ahead), producing a buy/hold/sell series.",
+    )
     images: list[ImageAttachment] = Field(
         default_factory=list,
         description="Screenshots to read figures from; sent as image blocks, not inside the JSON payload.",
@@ -458,6 +463,31 @@ class SignalBlock(Strict):
     conditions_for_downgrade: list[str]
 
 
+class PillarScores(Strict):
+    """Point-in-time pillar scores, 0-100 (100 = most favourable); 0 with `valuation_assessed` false
+    when valuation could not be assessed for that date."""
+
+    valuation: int = Field(ge=0, le=100)
+    profitability_stability: int = Field(ge=0, le=100)
+    debt_health: int = Field(ge=0, le=100)
+    earnings_quality: int = Field(ge=0, le=100)
+    trends: int = Field(ge=0, le=100)
+
+
+class SignalPoint(Strict):
+    """The framework applied as of `period_end`, using only information available at that date."""
+
+    period_end: str
+    period_type: PeriodType
+    category: Signal
+    conviction_pct: int = Field(ge=0, le=100)
+    reliability_pct: int = Field(ge=0, le=100)
+    valuation_assessed: bool = Field(description="false when no price/multiples for that date; extreme categories then unavailable")
+    pillar_scores: PillarScores
+    decisive_factor: str = Field(description="One sentence: what drove the category at that date")
+    source_ids: list[str] = Field(description="Sources for the point-in-time price and any as-of figures")
+
+
 class DataGap(Strict):
     measure_id: str = Field(description="A measure id from the catalogue, or empty string for a general gap")
     description: str
@@ -476,6 +506,10 @@ class AnalysisResponse(Strict):
     pillars: list[Pillar]
     trend_summary: TrendSummary
     signal: SignalBlock
+    signal_history: list[SignalPoint] = Field(
+        description="Chronological, one point per fiscal year-end in the period (plus the latest TTM/quarter "
+        "when it differs from the last year-end); empty when not requested"
+    )
     currency_notes: str = Field(
         description="Reporting currency, listing currency, and the FX rate/date/source used for price-side "
         "conversion, or 'no conversion'"

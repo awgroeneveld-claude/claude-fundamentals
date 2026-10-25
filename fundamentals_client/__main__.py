@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("request", help="path to a JSON file matching AnalysisRequest")
     a.add_argument("--out", help="write the JSON result here (default: stdout)")
     a.add_argument("--yaml", action="store_true", help="also write a .yaml next to --out")
-    a.add_argument("--model", default="claude-opus-5-5")
+    a.add_argument("--model", default="claude-sonnet-5-5")
     a.add_argument("--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"])
     a.add_argument("--max-tokens", type=int, default=64_000)
     a.add_argument(

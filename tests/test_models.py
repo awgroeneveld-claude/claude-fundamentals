@@ -127,3 +127,12 @@ def test_base_currency_completeness_is_checked():
                             "closing_rate": 1.21, "source_ids": ["S1"], "reliability_pct": 90}]
     w = consistency_warnings(AnalysisResponse.model_validate(data))
     assert any("value_base is null" in x for x in w), w
+
+
+def test_signal_history_checks():
+    data = json.loads((ROOT / "examples" / "sample_response.json").read_text())
+    data["signal_history"][0]["category"] = "extreme_sell"  # without valuation assessed
+    data["signal_history"][0]["period_end"] = "2025-01-01"  # breaks chronology
+    w = consistency_warnings(AnalysisResponse.model_validate(data))
+    assert any("without valuation assessed" in x for x in w), w
+    assert any("not chronological" in x for x in w), w

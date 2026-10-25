@@ -547,6 +547,46 @@
       ],
       "title": "PillarId"
     },
+    "PillarScores": {
+      "type": "object",
+      "description": "Point-in-time pillar scores, 0-100 (100 = most favourable); 0 with `valuation_assessed` false\nwhen valuation could not be assessed for that date.",
+      "title": "PillarScores",
+      "properties": {
+        "valuation": {
+          "type": "integer",
+          "title": "Valuation",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "profitability_stability": {
+          "type": "integer",
+          "title": "Profitability Stability",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "debt_health": {
+          "type": "integer",
+          "title": "Debt Health",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "earnings_quality": {
+          "type": "integer",
+          "title": "Earnings Quality",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "trends": {
+          "type": "integer",
+          "title": "Trends",
+          "description": "{maximum: 100, minimum: 0}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "valuation",
+        "profitability_stability",
+        "debt_health",
+        "earnings_quality",
+        "trends"
+      ]
+    },
     "RelativePosition": {
       "type": "string",
       "enum": [
@@ -640,6 +680,66 @@
         "red_flags",
         "conditions_for_upgrade",
         "conditions_for_downgrade"
+      ]
+    },
+    "SignalPoint": {
+      "type": "object",
+      "description": "The framework applied as of `period_end`, using only information available at that date.",
+      "title": "SignalPoint",
+      "properties": {
+        "period_end": {
+          "type": "string",
+          "title": "Period End"
+        },
+        "period_type": {
+          "$ref": "#/$defs/PeriodType"
+        },
+        "category": {
+          "$ref": "#/$defs/Signal"
+        },
+        "conviction_pct": {
+          "type": "integer",
+          "title": "Conviction Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "valuation_assessed": {
+          "type": "boolean",
+          "description": "false when no price/multiples for that date; extreme categories then unavailable",
+          "title": "Valuation Assessed"
+        },
+        "pillar_scores": {
+          "$ref": "#/$defs/PillarScores"
+        },
+        "decisive_factor": {
+          "type": "string",
+          "description": "One sentence: what drove the category at that date",
+          "title": "Decisive Factor"
+        },
+        "source_ids": {
+          "type": "array",
+          "description": "Sources for the point-in-time price and any as-of figures",
+          "title": "Source Ids",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "period_end",
+        "period_type",
+        "category",
+        "conviction_pct",
+        "reliability_pct",
+        "valuation_assessed",
+        "pillar_scores",
+        "decisive_factor",
+        "source_ids"
       ]
     },
     "Source": {
@@ -898,6 +998,14 @@
     "signal": {
       "$ref": "#/$defs/SignalBlock"
     },
+    "signal_history": {
+      "type": "array",
+      "description": "Chronological, one point per fiscal year-end in the period (plus the latest TTM/quarter when it differs from the last year-end); empty when not requested",
+      "title": "Signal History",
+      "items": {
+        "$ref": "#/$defs/SignalPoint"
+      }
+    },
     "currency_notes": {
       "type": "string",
       "description": "Reporting currency, listing currency, and the FX rate/date/source used for price-side conversion, or 'no conversion'",
@@ -945,6 +1053,7 @@
     "pillars",
     "trend_summary",
     "signal",
+    "signal_history",
     "currency_notes",
     "fx",
     "sector_adjustments",

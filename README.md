@@ -95,12 +95,29 @@ pillars[]        valuation | profitability_stability | debt_health | earnings_qu
 trend_summary    overall_direction, improving[], stable[], deteriorating[], inflections[], operating_vs_non_operating, reliability_pct
 signal           category (extreme_buy|buy|hold|sell|extreme_sell), conviction_pct, reliability_pct, rationale,
                  green_flags[], red_flags[], conditions_for_upgrade[], conditions_for_downgrade[]
+signal_history[] period_end, period_type, category, conviction_pct, reliability_pct, valuation_assessed,
+                 pillar_scores {valuation, profitability_stability, debt_health, earnings_quality, trends}, decisive_factor, source_ids[]
 currency_notes, fx {reporting_currency, base_currency, rates[] {period_end, period_type, average_rate, closing_rate, source_ids[], reliability_pct}, method_note}
 sector_adjustments[], data_gaps[], overall_reliability_pct, disclaimer
 ```
 
 A complete, rule-conformant example is `examples/sample_response.json` (hand-built from the
 supplied-data request by `examples/make_sample_response.py`, not model output).
+
+### Signal over time
+
+`signal_history` (request flag `signal_history`, default true) is the framework applied as of each
+fiscal year-end in the period, plus the latest TTM or quarter when it is later: at each date only
+figures for periods ending on or before it, trailing multiples from the share price on that date,
+trends from the series up to that date. Each point carries the category, conviction, reliability,
+the five pillar scores and a one-sentence decisive factor, so you can see when the verdict changed
+and why. Where no historical price can be sourced for a date the valuation pillar is marked
+unassessed and the extreme categories are unavailable for that point. Two caveats, stated in the
+prompt: it is a retrospective application of the framework to reported figures, not what an
+analyst knew at the time (no consensus estimates or guidance), and reliability is usually lower
+for older points. The report shows the series as a table, a step chart of the category, and charts
+of conviction/reliability and pillar scores over time. The current `signal` remains the as-of-today
+verdict.
 
 ### Currencies
 
@@ -160,7 +177,7 @@ anthropic-version: 2026-10-21
 anthropic-beta: server-side-fallback-2026-07-01
 
 {
-  "model": "claude-opus-5-5",
+  "model": "claude-sonnet-5-5",
   "max_tokens": 64000,
   "stream": true,
   "system": [{"type": "text", "text": "<prompts/system_prompt.md>", "cache_control": {"type": "ephemeral"}}],
@@ -174,9 +191,10 @@ anthropic-beta: server-side-fallback-2026-07-01
 
 Why each piece:
 
-* **`claude-opus-5-5`, `effort: high`.** Thinking is always on for this model; effort is the depth
-  control and its default is `medium`, so it is set explicitly. Use `xhigh` if you find gaps in
-  reasoning, `medium` for cheaper screening runs.
+* **`claude-sonnet-5-5`, `effort: high`.** Sonnet 5.5 is the default at $2/$10 per million tokens;
+  pass `--model claude-opus-5-5` ($4/$20) for names where you want the deeper model, and compare
+  on a few symbols before settling. Thinking is adaptive on both; effort is the depth control and is
+  set explicitly. Use `xhigh` if you find gaps in reasoning, `medium` for cheaper screening runs.
 * **Streaming.** Thinking plus a large JSON document can take minutes; non-streaming requests risk
   HTTP timeouts. The Rust client parses the SSE events itself (`rust/src/sse.rs`).
 * **Schema: prompt-embedded by default, API-enforced as an option.** The checked-in JSON Schema is
@@ -201,8 +219,7 @@ Why each piece:
 * **No `temperature` / `top_p` / `top_k`.** API version `2026-10-21` rejects them.
 
 Rough cost per analysis at `high` effort with web research: 100k to 300k input tokens (mostly
-fetched pages, partly cached) and 15k to 40k output tokens, roughly USD 1 to 2 at Opus 5.5 list
-prices, plus web search at USD 10 per 1,000 searches. With `supplied_data` and no web research,
+fetched pages, partly cached) and 15k to 40k output tokens, roughly USD 0.5 to 1 at Sonnet 5.5 list prices (double on Opus 5.5), plus web search at USD 10 per 1,000 searches. With `supplied_data` and no web research,
 expect a fraction of that. Both CLIs print the token counts after each run.
 
 ## 4. Install and run: Rust
