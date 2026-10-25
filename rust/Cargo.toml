@@ -1,0 +1,28 @@
+[package]
+name = "fundamentals-client"
+version = "0.1.0"
+edition = "2021"
+description = "Structured fundamental-analysis calls to the Claude Messages API with per-measure reliability"
+license = "MIT"
+
+[lib]
+name = "fundamentals_client"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fundamentals"
+path = "src/main.rs"
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+bytes = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }

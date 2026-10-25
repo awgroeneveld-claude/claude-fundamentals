@@ -1,0 +1,811 @@
+{
+  "schema_version": "1.0",
+  "request": {
+    "symbol": "EXMP",
+    "company_name": "Example Industries plc",
+    "exchange": null,
+    "reporting_currency": "GBP",
+    "period_start": "2021-01-01",
+    "period_end": "2024-12-31",
+    "frequency": "annual",
+    "categories": [
+      "profitability",
+      "leverage",
+      "cash_flow_quality",
+      "growth"
+    ]
+  },
+  "analysis_date": "2026-10-25",
+  "data_mode": "supplied",
+  "sources": [
+    {
+      "id": "S1",
+      "type": "supplied_input",
+      "title": "Caller-supplied statements: audited annual reports via internal data warehouse",
+      "url": null,
+      "period_covered": "FY2021-FY2024, GBP millions",
+      "retrieved_at": null
+    }
+  ],
+  "measures": [
+    {
+      "measure_id": "revenue",
+      "category": "profitability",
+      "label": "Revenue",
+      "unit": "currency",
+      "currency": "GBP",
+      "scale": "millions",
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 2150,
+        "reliability_pct": 100,
+        "method": "reported",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 1820,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 1975,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 2104,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 2150,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "improving",
+        "cagr_pct": 5.71,
+        "latest_yoy_change_pct": 2.19,
+        "coefficient_of_variation": 0.064,
+        "vs_own_history": "top_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 95,
+        "comment": "Growth slowed from 8.5% (2022) to 2.2% (2024)."
+      },
+      "reliability_pct": 100,
+      "reliability_basis": "Read directly from supplied_data (audited annual reports); period and units match.",
+      "notes": null
+    },
+    {
+      "measure_id": "operating_margin",
+      "category": "profitability",
+      "label": "Operating margin",
+      "unit": "percent",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 11.35,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 11.98,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 11.7,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 12.45,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 11.35,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": -1.78,
+        "latest_yoy_change_pct": -8.86,
+        "coefficient_of_variation": 0.034,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Peaked at 12.5% in FY2023, fell to 11.3% in FY2024 as revenue growth stalled."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    },
+    {
+      "measure_id": "net_margin",
+      "category": "profitability",
+      "label": "Net profit margin",
+      "unit": "percent",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 6.47,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 8.3,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 8.0,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 8.13,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 6.47,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": -7.98,
+        "latest_yoy_change_pct": -20.45,
+        "coefficient_of_variation": 0.095,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Compressed to 6.5% in FY2024; rising interest expense is the main driver below EBIT."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    },
+    {
+      "measure_id": "debt_to_equity",
+      "category": "leverage",
+      "label": "Debt-to-equity",
+      "unit": "ratio",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 0.8,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 0.54,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 0.58,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 0.7,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 0.8,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": 13.6,
+        "latest_yoy_change_pct": 13.41,
+        "coefficient_of_variation": 0.154,
+        "vs_own_history": "top_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Total debt grew 66% over the period against 13% equity growth."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    },
+    {
+      "measure_id": "interest_coverage",
+      "category": "leverage",
+      "label": "Interest coverage (EBIT / interest)",
+      "unit": "ratio",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 4.44,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 9.08,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 7.97,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 6.39,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 4.44,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": -21.25,
+        "latest_yoy_change_pct": -30.58,
+        "coefficient_of_variation": 0.251,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Coverage halved from 9.1x to 4.4x; interest expense more than doubled."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    },
+    {
+      "measure_id": "net_debt_to_ebitda",
+      "category": "leverage",
+      "label": "Net debt / EBITDA",
+      "unit": "ratio",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": null,
+        "reliability_pct": 0,
+        "method": "unavailable",
+        "source_ids": []
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": null,
+          "reliability_pct": 0,
+          "method": "unavailable",
+          "source_ids": []
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": null,
+          "reliability_pct": 0,
+          "method": "unavailable",
+          "source_ids": []
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": null,
+          "reliability_pct": 0,
+          "method": "unavailable",
+          "source_ids": []
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": null,
+          "reliability_pct": 0,
+          "method": "unavailable",
+          "source_ids": []
+        }
+      ],
+      "trend": {
+        "direction": "insufficient_data",
+        "cagr_pct": null,
+        "latest_yoy_change_pct": null,
+        "coefficient_of_variation": null,
+        "vs_own_history": "unknown",
+        "vs_peers": "unknown",
+        "reliability_pct": 0,
+        "comment": "Not enough data points."
+      },
+      "reliability_pct": 0,
+      "reliability_basis": "EBITDA (depreciation and amortisation) not present in supplied_data; web research disabled.",
+      "notes": "Net debt itself is computable (GBP 890m at FY2024) but no EBITDA denominator was supplied."
+    },
+    {
+      "measure_id": "operating_cash_flow",
+      "category": "cash_flow_quality",
+      "label": "Operating cash flow",
+      "unit": "currency",
+      "currency": "GBP",
+      "scale": "millions",
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 121,
+        "reliability_pct": 100,
+        "method": "reported",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 205,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 190,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 160,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 121,
+          "reliability_pct": 100,
+          "method": "reported",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": -16.12,
+        "latest_yoy_change_pct": -24.38,
+        "coefficient_of_variation": 0.19,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 95,
+        "comment": "Declined every year while net income rose until FY2023."
+      },
+      "reliability_pct": 100,
+      "reliability_basis": "Read directly from supplied_data (audited annual reports); period and units match.",
+      "notes": null
+    },
+    {
+      "measure_id": "free_cash_flow",
+      "category": "cash_flow_quality",
+      "label": "Free cash flow",
+      "unit": "currency",
+      "currency": "GBP",
+      "scale": "millions",
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": -19,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 117,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 88,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 29,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": -19,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": null,
+        "latest_yoy_change_pct": -165.52,
+        "coefficient_of_variation": 0.979,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Turned negative in FY2024 (GBP -19m) as capex rose and OCF fell."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    },
+    {
+      "measure_id": "cash_conversion",
+      "category": "cash_flow_quality",
+      "label": "Cash conversion (OCF / net income)",
+      "unit": "ratio",
+      "currency": null,
+      "scale": null,
+      "latest": {
+        "period_end": "2024-12-31",
+        "period_type": "FY",
+        "value": 0.87,
+        "reliability_pct": 92,
+        "method": "derived",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "series": [
+        {
+          "period_end": "2021-12-31",
+          "period_type": "FY",
+          "value": 1.36,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2022-12-31",
+          "period_type": "FY",
+          "value": 1.2,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2023-12-31",
+          "period_type": "FY",
+          "value": 0.94,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        },
+        {
+          "period_end": "2024-12-31",
+          "period_type": "FY",
+          "value": 0.87,
+          "reliability_pct": 92,
+          "method": "derived",
+          "source_ids": [
+            "S1"
+          ]
+        }
+      ],
+      "trend": {
+        "direction": "deteriorating",
+        "cagr_pct": -13.77,
+        "latest_yoy_change_pct": -6.96,
+        "coefficient_of_variation": 0.181,
+        "vs_own_history": "bottom_quartile",
+        "vs_peers": "unknown",
+        "reliability_pct": 90,
+        "comment": "Fell below 1.0 in FY2023 and FY2024: earnings increasingly accrual-based."
+      },
+      "reliability_pct": 92,
+      "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
+      "notes": null
+    }
+  ],
+  "ownership": null,
+  "context": null,
+  "pillars": [
+    {
+      "pillar": "valuation",
+      "assessment": "not_assessed",
+      "score_0_100": 50,
+      "key_measures": [],
+      "rationale": "Valuation category not requested and no price data supplied.",
+      "reliability_pct": 0
+    },
+    {
+      "pillar": "profitability_stability",
+      "assessment": "weak",
+      "score_0_100": 38,
+      "key_measures": [
+        "revenue",
+        "operating_margin",
+        "net_margin"
+      ],
+      "rationale": "Margins are stable in level (CV 0.04) but turned down in FY2024; net margin at a four-year low of 6.5%.",
+      "reliability_pct": 94
+    },
+    {
+      "pillar": "debt_health",
+      "assessment": "weak",
+      "score_0_100": 30,
+      "key_measures": [
+        "debt_to_equity",
+        "interest_coverage",
+        "net_debt_to_ebitda"
+      ],
+      "rationale": "D/E up from 0.55 to 0.80 and coverage down from 9.1x to 4.4x in three years; net debt/EBITDA unavailable.",
+      "reliability_pct": 61
+    },
+    {
+      "pillar": "earnings_quality",
+      "assessment": "poor",
+      "score_0_100": 22,
+      "key_measures": [
+        "operating_cash_flow",
+        "free_cash_flow",
+        "cash_conversion"
+      ],
+      "rationale": "Cash conversion 0.87 and negative FCF in FY2024 while dividends and buybacks (GBP 120m) were funded with debt.",
+      "reliability_pct": 94
+    },
+    {
+      "pillar": "trends",
+      "assessment": "weak",
+      "score_0_100": 30,
+      "key_measures": [
+        "revenue",
+        "operating_margin",
+        "debt_to_equity",
+        "cash_conversion"
+      ],
+      "rationale": "Revenue growth decelerating, margins compressing, leverage rising, cash conversion falling: all four series point the same way.",
+      "reliability_pct": 94
+    }
+  ],
+  "trend_summary": {
+    "overall_direction": "deteriorating",
+    "improving": [],
+    "stable": [
+      "revenue"
+    ],
+    "deteriorating": [
+      "operating_margin",
+      "net_margin",
+      "debt_to_equity",
+      "interest_coverage",
+      "operating_cash_flow",
+      "free_cash_flow",
+      "cash_conversion"
+    ],
+    "inflections": [
+      {
+        "measure_id": "free_cash_flow",
+        "period_end": "2024-12-31",
+        "description": "FCF turned negative for the first time in the period."
+      },
+      {
+        "measure_id": "cash_conversion",
+        "period_end": "2023-12-31",
+        "description": "OCF fell below net income and stayed there."
+      }
+    ],
+    "operating_vs_non_operating": "Core operating margin eroded ~1pt from its FY2023 peak; the larger hit to net margin comes from interest expense (finance cost) rising from 1.3% to 2.6% of revenue.",
+    "reliability_pct": 90
+  },
+  "signal": {
+    "category": "sell",
+    "conviction_pct": 72,
+    "reliability_pct": 81,
+    "rationale": "Three assessed pillars are weak-to-poor and move in the same direction: leverage and interest burden rising, cash conversion below 1.0 for two years, FCF negative while shareholder distributions were debt-funded. Valuation was not assessed, so extreme_sell is not available under the alignment rule.",
+    "green_flags": [
+      "Revenue still growing (5.7% CAGR)",
+      "Gross margin broadly stable at ~36%"
+    ],
+    "red_flags": [
+      "Interest coverage 4.4x and falling",
+      "Negative FCF in FY2024",
+      "Cash conversion 0.87",
+      "D/E 0.80, up 46% since FY2021"
+    ],
+    "conditions_for_upgrade": [
+      "Cash conversion back above 1.0 for two consecutive years",
+      "Capex normalising so FCF covers distributions",
+      "Interest coverage above 6x"
+    ],
+    "conditions_for_downgrade": [
+      "Valuation data showing P/E or EV/EBITDA above peer median",
+      "Further coverage decline below 3x",
+      "Dividend maintained with continued negative FCF"
+    ]
+  },
+  "sector_adjustments": [
+    "Industrial machinery: D/E up to ~1.0 and net debt/EBITDA up to ~2.5x treated as moderate rather than high."
+  ],
+  "data_gaps": [
+    {
+      "measure_id": "net_debt_to_ebitda",
+      "description": "No depreciation/amortisation in supplied_data; cannot compute EBITDA."
+    },
+    {
+      "measure_id": null,
+      "description": "Valuation category not requested; no price, market cap or share count supplied."
+    }
+  ],
+  "overall_reliability_pct": 94,
+  "disclaimer": "Analytical output for research purposes; not personalised investment advice."
+}

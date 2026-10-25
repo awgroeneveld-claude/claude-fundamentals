@@ -1,0 +1,267 @@
+{
+  "$defs": {
+    "Category": {
+      "enum": [
+        "valuation",
+        "profitability",
+        "non_operating",
+        "leverage",
+        "cash_flow_quality",
+        "growth",
+        "ownership",
+        "context"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "Frequency": {
+      "enum": [
+        "annual",
+        "quarterly",
+        "both"
+      ],
+      "title": "Frequency",
+      "type": "string"
+    },
+    "MeasureId": {
+      "enum": [
+        "share_price",
+        "market_cap",
+        "enterprise_value",
+        "pe_trailing",
+        "pe_forward",
+        "pb",
+        "ps",
+        "ev_ebitda",
+        "ev_sales",
+        "fcf_yield",
+        "earnings_yield",
+        "peg",
+        "dividend_yield",
+        "payout_ratio",
+        "pe_historical_percentile",
+        "ev_ebitda_historical_percentile",
+        "revenue",
+        "gross_profit",
+        "gross_margin",
+        "operating_income",
+        "operating_margin",
+        "ebitda",
+        "ebitda_margin",
+        "net_income",
+        "net_margin",
+        "eps_diluted",
+        "roe",
+        "roa",
+        "roic",
+        "margin_stability_cv",
+        "earnings_variability_cv",
+        "interest_income",
+        "interest_expense",
+        "investment_gains_losses",
+        "fx_and_derivative_result",
+        "other_income_expense",
+        "net_non_operating_result",
+        "non_operating_pct_revenue",
+        "non_operating_pct_operating_income",
+        "one_time_items",
+        "long_term_debt",
+        "short_term_debt",
+        "total_debt",
+        "cash_and_equivalents",
+        "net_debt",
+        "shareholders_equity",
+        "total_assets",
+        "debt_to_equity",
+        "debt_to_assets",
+        "lt_debt_to_assets",
+        "net_debt_to_ebitda",
+        "interest_coverage",
+        "current_ratio",
+        "operating_cash_flow",
+        "capex",
+        "free_cash_flow",
+        "fcf_margin",
+        "accruals",
+        "cash_conversion",
+        "accrual_ratio",
+        "sloan_accrual_ratio",
+        "piotroski_f_score",
+        "working_capital_change",
+        "net_share_issuance",
+        "capital_returned_pct_fcf",
+        "revenue_growth_yoy",
+        "revenue_cagr",
+        "operating_income_cagr",
+        "net_income_cagr",
+        "fcf_cagr",
+        "eps_growth_yoy",
+        "asset_turnover",
+        "institutional_ownership_pct",
+        "insider_ownership_pct",
+        "insider_net_buying",
+        "shares_outstanding",
+        "shares_outstanding_change_pct"
+      ],
+      "title": "MeasureId",
+      "type": "string"
+    },
+    "Period": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "description": "ISO date, inclusive, e.g. 2016-01-01",
+          "title": "Start",
+          "type": "string"
+        },
+        "end": {
+          "description": "ISO date, inclusive, e.g. 2025-12-31",
+          "title": "End",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Period",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "symbol": {
+      "description": "Ticker symbol, e.g. AAPL, ASML, 'ASML.AS'",
+      "title": "Symbol",
+      "type": "string"
+    },
+    "exchange": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Exchange hint, e.g. NASDAQ, Euronext Amsterdam",
+      "title": "Exchange"
+    },
+    "company_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Company Name"
+    },
+    "reporting_currency": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ISO 4217, e.g. USD, EUR",
+      "title": "Reporting Currency"
+    },
+    "period": {
+      "$ref": "#/$defs/Period"
+    },
+    "frequency": {
+      "$ref": "#/$defs/Frequency",
+      "default": "annual"
+    },
+    "categories": {
+      "description": "Subset of the framework's data categories to analyse.",
+      "items": {
+        "$ref": "#/$defs/Category"
+      },
+      "title": "Categories",
+      "type": "array"
+    },
+    "measures": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/MeasureId"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional whitelist of measure ids. When set, only these are produced (plus whatever the signal needs, flagged in notes).",
+      "title": "Measures"
+    },
+    "peer_symbols": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Peer Symbols",
+      "type": "array"
+    },
+    "sector_hint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "e.g. 'regulated utility', 'enterprise software'",
+      "title": "Sector Hint"
+    },
+    "allow_web_research": {
+      "default": true,
+      "description": "Let Claude use the web_search / web_fetch server tools to gather figures.",
+      "title": "Allow Web Research",
+      "type": "boolean"
+    },
+    "supplied_data": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Raw financial-statement data from your own provider (any JSON shape; describe units/periods inside it). When present, it is the preferred source.",
+      "title": "Supplied Data"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Free-text instructions within the framework's scope.",
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "symbol",
+    "period"
+  ],
+  "title": "AnalysisRequest",
+  "type": "object"
+}

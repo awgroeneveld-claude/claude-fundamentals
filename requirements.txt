@@ -1,0 +1,5 @@
+anthropic>=2.3.0
+pydantic>=2.6
+# optional
+pyyaml>=6
+pytest>=8

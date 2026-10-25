@@ -1,0 +1,9 @@
+{
+  "symbol": "AAPL",
+  "exchange": "NASDAQ",
+  "period": { "start": "2023-01-01", "end": "2025-09-30" },
+  "frequency": "quarterly",
+  "categories": ["profitability", "cash_flow_quality"],
+  "measures": ["revenue", "gross_margin", "operating_margin", "net_margin", "operating_cash_flow", "free_cash_flow", "cash_conversion"],
+  "allow_web_research": true
+}

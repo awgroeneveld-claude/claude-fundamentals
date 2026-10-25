@@ -1,0 +1,1104 @@
+{
+  "$defs": {
+    "Assessment": {
+      "type": "string",
+      "enum": [
+        "strong",
+        "favorable",
+        "neutral",
+        "weak",
+        "poor",
+        "not_assessed"
+      ],
+      "title": "Assessment"
+    },
+    "Category": {
+      "type": "string",
+      "enum": [
+        "valuation",
+        "profitability",
+        "non_operating",
+        "leverage",
+        "cash_flow_quality",
+        "growth",
+        "ownership",
+        "context"
+      ],
+      "title": "Category"
+    },
+    "Context": {
+      "type": "object",
+      "title": "Context",
+      "properties": {
+        "industry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Industry"
+        },
+        "peer_set_used": {
+          "type": "array",
+          "title": "Peer Set Used",
+          "items": {
+            "type": "string"
+          }
+        },
+        "segment_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Segment Notes"
+        },
+        "management_commentary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Management Commentary"
+        },
+        "dividend_policy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dividend Policy"
+        },
+        "accounting_flags": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Restatements, auditor notes, off-balance-sheet items",
+          "title": "Accounting Flags"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "industry",
+        "peer_set_used",
+        "segment_notes",
+        "management_commentary",
+        "dividend_policy",
+        "accounting_flags",
+        "reliability_pct"
+      ]
+    },
+    "DataGap": {
+      "type": "object",
+      "title": "DataGap",
+      "properties": {
+        "measure_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MeasureId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "type": "string",
+          "title": "Description"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "measure_id",
+        "description"
+      ]
+    },
+    "DataMode": {
+      "type": "string",
+      "enum": [
+        "supplied",
+        "retrieved",
+        "mixed",
+        "recall_only"
+      ],
+      "title": "DataMode"
+    },
+    "DataPoint": {
+      "type": "object",
+      "title": "DataPoint",
+      "properties": {
+        "period_end": {
+          "type": "string",
+          "description": "ISO date of the period end (or snapshot date)",
+          "title": "Period End"
+        },
+        "period_type": {
+          "$ref": "#/$defs/PeriodType"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null when unavailable; never invent a number",
+          "title": "Value"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "description": "0-100 per the rubric in the system prompt\n\n{maximum: 100, minimum: 0}",
+          "title": "Reliability Pct"
+        },
+        "method": {
+          "$ref": "#/$defs/Method"
+        },
+        "source_ids": {
+          "type": "array",
+          "description": "ids from `sources`; empty only when method is unavailable",
+          "title": "Source Ids",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "period_end",
+        "period_type",
+        "value",
+        "reliability_pct",
+        "method",
+        "source_ids"
+      ]
+    },
+    "Direction": {
+      "type": "string",
+      "enum": [
+        "improving",
+        "stable",
+        "deteriorating",
+        "volatile",
+        "insufficient_data"
+      ],
+      "title": "Direction"
+    },
+    "Frequency": {
+      "type": "string",
+      "enum": [
+        "annual",
+        "quarterly",
+        "both"
+      ],
+      "title": "Frequency"
+    },
+    "Holder": {
+      "type": "object",
+      "title": "Holder",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name"
+        },
+        "pct_of_shares": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pct Of Shares"
+        },
+        "holder_type": {
+          "type": "string",
+          "enum": [
+            "institution",
+            "insider",
+            "strategic",
+            "fund",
+            "other"
+          ],
+          "title": "Holder Type"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "As Of"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "source_ids": {
+          "type": "array",
+          "title": "Source Ids",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "pct_of_shares",
+        "holder_type",
+        "as_of",
+        "reliability_pct",
+        "source_ids"
+      ]
+    },
+    "Inflection": {
+      "type": "object",
+      "title": "Inflection",
+      "properties": {
+        "measure_id": {
+          "$ref": "#/$defs/MeasureId"
+        },
+        "period_end": {
+          "type": "string",
+          "title": "Period End"
+        },
+        "description": {
+          "type": "string",
+          "title": "Description"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "measure_id",
+        "period_end",
+        "description"
+      ]
+    },
+    "Measure": {
+      "type": "object",
+      "title": "Measure",
+      "properties": {
+        "measure_id": {
+          "$ref": "#/$defs/MeasureId"
+        },
+        "category": {
+          "$ref": "#/$defs/Category"
+        },
+        "label": {
+          "type": "string",
+          "title": "Label"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ISO 4217 when unit is currency/per_share, else null",
+          "title": "Currency"
+        },
+        "scale": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Scale"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scale for currency amounts, null otherwise"
+        },
+        "latest": {
+          "$ref": "#/$defs/DataPoint"
+        },
+        "series": {
+          "type": "array",
+          "description": "Chronological, oldest first, within the requested period",
+          "title": "Series",
+          "items": {
+            "$ref": "#/$defs/DataPoint"
+          }
+        },
+        "trend": {
+          "$ref": "#/$defs/Trend"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "description": "Overall reliability of this measure\n\n{maximum: 100, minimum: 0}",
+          "title": "Reliability Pct"
+        },
+        "reliability_basis": {
+          "type": "string",
+          "description": "Why this reliability: source quality, period alignment, assumptions",
+          "title": "Reliability Basis"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "measure_id",
+        "category",
+        "label",
+        "unit",
+        "currency",
+        "scale",
+        "latest",
+        "series",
+        "trend",
+        "reliability_pct",
+        "reliability_basis",
+        "notes"
+      ]
+    },
+    "MeasureId": {
+      "type": "string",
+      "enum": [
+        "share_price",
+        "market_cap",
+        "enterprise_value",
+        "pe_trailing",
+        "pe_forward",
+        "pb",
+        "ps",
+        "ev_ebitda",
+        "ev_sales",
+        "fcf_yield",
+        "earnings_yield",
+        "peg",
+        "dividend_yield",
+        "payout_ratio",
+        "pe_historical_percentile",
+        "ev_ebitda_historical_percentile",
+        "revenue",
+        "gross_profit",
+        "gross_margin",
+        "operating_income",
+        "operating_margin",
+        "ebitda",
+        "ebitda_margin",
+        "net_income",
+        "net_margin",
+        "eps_diluted",
+        "roe",
+        "roa",
+        "roic",
+        "margin_stability_cv",
+        "earnings_variability_cv",
+        "interest_income",
+        "interest_expense",
+        "investment_gains_losses",
+        "fx_and_derivative_result",
+        "other_income_expense",
+        "net_non_operating_result",
+        "non_operating_pct_revenue",
+        "non_operating_pct_operating_income",
+        "one_time_items",
+        "long_term_debt",
+        "short_term_debt",
+        "total_debt",
+        "cash_and_equivalents",
+        "net_debt",
+        "shareholders_equity",
+        "total_assets",
+        "debt_to_equity",
+        "debt_to_assets",
+        "lt_debt_to_assets",
+        "net_debt_to_ebitda",
+        "interest_coverage",
+        "current_ratio",
+        "operating_cash_flow",
+        "capex",
+        "free_cash_flow",
+        "fcf_margin",
+        "accruals",
+        "cash_conversion",
+        "accrual_ratio",
+        "sloan_accrual_ratio",
+        "piotroski_f_score",
+        "working_capital_change",
+        "net_share_issuance",
+        "capital_returned_pct_fcf",
+        "revenue_growth_yoy",
+        "revenue_cagr",
+        "operating_income_cagr",
+        "net_income_cagr",
+        "fcf_cagr",
+        "eps_growth_yoy",
+        "asset_turnover",
+        "institutional_ownership_pct",
+        "insider_ownership_pct",
+        "insider_net_buying",
+        "shares_outstanding",
+        "shares_outstanding_change_pct"
+      ],
+      "title": "MeasureId"
+    },
+    "Method": {
+      "type": "string",
+      "enum": [
+        "reported",
+        "derived",
+        "estimated",
+        "unavailable"
+      ],
+      "title": "Method"
+    },
+    "Ownership": {
+      "type": "object",
+      "title": "Ownership",
+      "properties": {
+        "top_holders": {
+          "type": "array",
+          "title": "Top Holders",
+          "items": {
+            "$ref": "#/$defs/Holder"
+          }
+        },
+        "recent_insider_activity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Summary of buys/sells in the period, or null",
+          "title": "Recent Insider Activity"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "top_holders",
+        "recent_insider_activity",
+        "reliability_pct",
+        "notes"
+      ]
+    },
+    "PeerComparison": {
+      "type": "string",
+      "enum": [
+        "better",
+        "in_line",
+        "worse",
+        "unknown"
+      ],
+      "title": "PeerComparison"
+    },
+    "PeriodType": {
+      "type": "string",
+      "enum": [
+        "FY",
+        "Q",
+        "TTM",
+        "FWD",
+        "POINT"
+      ],
+      "title": "PeriodType"
+    },
+    "Pillar": {
+      "type": "object",
+      "title": "Pillar",
+      "properties": {
+        "pillar": {
+          "$ref": "#/$defs/PillarId"
+        },
+        "assessment": {
+          "$ref": "#/$defs/Assessment"
+        },
+        "score_0_100": {
+          "type": "integer",
+          "description": "100 = most favourable for a long position\n\n{maximum: 100, minimum: 0}",
+          "title": "Score 0 100"
+        },
+        "key_measures": {
+          "type": "array",
+          "title": "Key Measures",
+          "items": {
+            "$ref": "#/$defs/MeasureId"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "title": "Rationale"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pillar",
+        "assessment",
+        "score_0_100",
+        "key_measures",
+        "rationale",
+        "reliability_pct"
+      ]
+    },
+    "PillarId": {
+      "type": "string",
+      "enum": [
+        "valuation",
+        "profitability_stability",
+        "debt_health",
+        "earnings_quality",
+        "trends"
+      ],
+      "title": "PillarId"
+    },
+    "RelativePosition": {
+      "type": "string",
+      "enum": [
+        "bottom_quartile",
+        "below_median",
+        "above_median",
+        "top_quartile",
+        "unknown"
+      ],
+      "title": "RelativePosition"
+    },
+    "RequestEcho": {
+      "type": "object",
+      "title": "RequestEcho",
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "title": "Symbol"
+        },
+        "company_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Company Name"
+        },
+        "exchange": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exchange"
+        },
+        "reporting_currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reporting Currency"
+        },
+        "period_start": {
+          "type": "string",
+          "title": "Period Start"
+        },
+        "period_end": {
+          "type": "string",
+          "title": "Period End"
+        },
+        "frequency": {
+          "$ref": "#/$defs/Frequency"
+        },
+        "categories": {
+          "type": "array",
+          "title": "Categories",
+          "items": {
+            "$ref": "#/$defs/Category"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "company_name",
+        "exchange",
+        "reporting_currency",
+        "period_start",
+        "period_end",
+        "frequency",
+        "categories"
+      ]
+    },
+    "Scale": {
+      "type": "string",
+      "enum": [
+        "units",
+        "thousands",
+        "millions",
+        "billions"
+      ],
+      "title": "Scale"
+    },
+    "Signal": {
+      "type": "string",
+      "enum": [
+        "extreme_buy",
+        "buy",
+        "hold",
+        "sell",
+        "extreme_sell"
+      ],
+      "title": "Signal"
+    },
+    "SignalBlock": {
+      "type": "object",
+      "title": "SignalBlock",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/Signal"
+        },
+        "conviction_pct": {
+          "type": "integer",
+          "description": "How strongly the evidence supports the category\n\n{maximum: 100, minimum: 0}",
+          "title": "Conviction Pct"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "description": "Bounded by the reliability of the inputs\n\n{maximum: 100, minimum: 0}",
+          "title": "Reliability Pct"
+        },
+        "rationale": {
+          "type": "string",
+          "title": "Rationale"
+        },
+        "green_flags": {
+          "type": "array",
+          "title": "Green Flags",
+          "items": {
+            "type": "string"
+          }
+        },
+        "red_flags": {
+          "type": "array",
+          "title": "Red Flags",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditions_for_upgrade": {
+          "type": "array",
+          "title": "Conditions For Upgrade",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditions_for_downgrade": {
+          "type": "array",
+          "title": "Conditions For Downgrade",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "conviction_pct",
+        "reliability_pct",
+        "rationale",
+        "green_flags",
+        "red_flags",
+        "conditions_for_upgrade",
+        "conditions_for_downgrade"
+      ]
+    },
+    "Source": {
+      "type": "object",
+      "title": "Source",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Short handle referenced by data points, e.g. S1",
+          "title": "Id"
+        },
+        "type": {
+          "$ref": "#/$defs/SourceType"
+        },
+        "title": {
+          "type": "string",
+          "title": "Title"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Url"
+        },
+        "period_covered": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "e.g. 'FY2024 10-K', 'as of 2025-09-30'",
+          "title": "Period Covered"
+        },
+        "retrieved_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ISO date when the page was fetched, or null for supplied/recall",
+          "title": "Retrieved At"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "title",
+        "url",
+        "period_covered",
+        "retrieved_at"
+      ]
+    },
+    "SourceType": {
+      "type": "string",
+      "enum": [
+        "primary_filing",
+        "company_ir",
+        "aggregator",
+        "supplied_input",
+        "web_other",
+        "model_recall"
+      ],
+      "title": "SourceType"
+    },
+    "Trend": {
+      "type": "object",
+      "title": "Trend",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "cagr_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Compound annual growth rate over the series, % per year",
+          "title": "Cagr Pct"
+        },
+        "latest_yoy_change_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Yoy Change Pct"
+        },
+        "coefficient_of_variation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "stdev / mean of the series, as a ratio",
+          "title": "Coefficient Of Variation"
+        },
+        "vs_own_history": {
+          "$ref": "#/$defs/RelativePosition"
+        },
+        "vs_peers": {
+          "$ref": "#/$defs/PeerComparison"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        },
+        "comment": {
+          "type": "string",
+          "description": "One or two sentences; what drives the trend",
+          "title": "Comment"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "cagr_pct",
+        "latest_yoy_change_pct",
+        "coefficient_of_variation",
+        "vs_own_history",
+        "vs_peers",
+        "reliability_pct",
+        "comment"
+      ]
+    },
+    "TrendSummary": {
+      "type": "object",
+      "title": "TrendSummary",
+      "properties": {
+        "overall_direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "improving": {
+          "type": "array",
+          "title": "Improving",
+          "items": {
+            "$ref": "#/$defs/MeasureId"
+          }
+        },
+        "stable": {
+          "type": "array",
+          "title": "Stable",
+          "items": {
+            "$ref": "#/$defs/MeasureId"
+          }
+        },
+        "deteriorating": {
+          "type": "array",
+          "title": "Deteriorating",
+          "items": {
+            "$ref": "#/$defs/MeasureId"
+          }
+        },
+        "inflections": {
+          "type": "array",
+          "title": "Inflections",
+          "items": {
+            "$ref": "#/$defs/Inflection"
+          }
+        },
+        "operating_vs_non_operating": {
+          "type": "string",
+          "description": "Whether core operating performance differs from reported results",
+          "title": "Operating Vs Non Operating"
+        },
+        "reliability_pct": {
+          "type": "integer",
+          "title": "Reliability Pct",
+          "description": "{maximum: 100, minimum: 0}"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "overall_direction",
+        "improving",
+        "stable",
+        "deteriorating",
+        "inflections",
+        "operating_vs_non_operating",
+        "reliability_pct"
+      ]
+    },
+    "Unit": {
+      "type": "string",
+      "enum": [
+        "currency",
+        "percent",
+        "ratio",
+        "multiple",
+        "count",
+        "score",
+        "per_share"
+      ],
+      "title": "Unit"
+    }
+  },
+  "type": "object",
+  "title": "AnalysisResponse",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "title": "Schema Version",
+      "description": "{const: 1.0}"
+    },
+    "request": {
+      "$ref": "#/$defs/RequestEcho"
+    },
+    "analysis_date": {
+      "type": "string",
+      "description": "ISO date the analysis was produced",
+      "title": "Analysis Date"
+    },
+    "data_mode": {
+      "$ref": "#/$defs/DataMode"
+    },
+    "sources": {
+      "type": "array",
+      "title": "Sources",
+      "items": {
+        "$ref": "#/$defs/Source"
+      }
+    },
+    "measures": {
+      "type": "array",
+      "title": "Measures",
+      "items": {
+        "$ref": "#/$defs/Measure"
+      }
+    },
+    "ownership": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Ownership"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Context"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pillars": {
+      "type": "array",
+      "title": "Pillars",
+      "items": {
+        "$ref": "#/$defs/Pillar"
+      }
+    },
+    "trend_summary": {
+      "$ref": "#/$defs/TrendSummary"
+    },
+    "signal": {
+      "$ref": "#/$defs/SignalBlock"
+    },
+    "sector_adjustments": {
+      "type": "array",
+      "description": "Threshold adjustments applied for the sector",
+      "title": "Sector Adjustments",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_gaps": {
+      "type": "array",
+      "title": "Data Gaps",
+      "items": {
+        "$ref": "#/$defs/DataGap"
+      }
+    },
+    "overall_reliability_pct": {
+      "type": "integer",
+      "title": "Overall Reliability Pct",
+      "description": "{maximum: 100, minimum: 0}"
+    },
+    "disclaimer": {
+      "type": "string",
+      "title": "Disclaimer"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request",
+    "analysis_date",
+    "data_mode",
+    "sources",
+    "measures",
+    "ownership",
+    "context",
+    "pillars",
+    "trend_summary",
+    "signal",
+    "sector_adjustments",
+    "data_gaps",
+    "overall_reliability_pct",
+    "disclaimer"
+  ]
+}

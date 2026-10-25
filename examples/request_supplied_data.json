@@ -1,0 +1,33 @@
+{
+  "symbol": "EXMP",
+  "company_name": "Example Industries plc",
+  "reporting_currency": "GBP",
+  "period": { "start": "2021-01-01", "end": "2024-12-31" },
+  "frequency": "annual",
+  "categories": ["profitability", "leverage", "cash_flow_quality", "growth"],
+  "sector_hint": "industrial machinery",
+  "allow_web_research": false,
+  "supplied_data": {
+    "units": "GBP millions, fiscal year ends 31 December",
+    "source": "audited annual reports via internal data warehouse",
+    "income_statement": {
+      "2021": { "revenue": 1820, "gross_profit": 655, "operating_income": 218, "interest_expense": 24, "net_income": 151 },
+      "2022": { "revenue": 1975, "gross_profit": 702, "operating_income": 231, "interest_expense": 29, "net_income": 158 },
+      "2023": { "revenue": 2104, "gross_profit": 768, "operating_income": 262, "interest_expense": 41, "net_income": 171 },
+      "2024": { "revenue": 2150, "gross_profit": 760, "operating_income": 244, "interest_expense": 55, "net_income": 139 }
+    },
+    "balance_sheet": {
+      "2021": { "total_assets": 2410, "total_debt": 610, "long_term_debt": 540, "cash": 190, "equity": 1120 },
+      "2022": { "total_assets": 2560, "total_debt": 690, "long_term_debt": 600, "cash": 175, "equity": 1190 },
+      "2023": { "total_assets": 2790, "total_debt": 880, "long_term_debt": 790, "cash": 160, "equity": 1250 },
+      "2024": { "total_assets": 2905, "total_debt": 1010, "long_term_debt": 920, "cash": 120, "equity": 1265 }
+    },
+    "cash_flow": {
+      "2021": { "operating_cash_flow": 205, "capex": 88, "dividends": 60, "buybacks": 0 },
+      "2022": { "operating_cash_flow": 190, "capex": 102, "dividends": 64, "buybacks": 20 },
+      "2023": { "operating_cash_flow": 160, "capex": 131, "dividends": 68, "buybacks": 40 },
+      "2024": { "operating_cash_flow": 121, "capex": 140, "dividends": 70, "buybacks": 50 }
+    }
+  },
+  "notes": "Internal provider data is authoritative; do not use memory for figures."
+}

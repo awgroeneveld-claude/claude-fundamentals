@@ -1,0 +1,403 @@
+//! Raw-HTTP client for the Claude Messages API (there is no official Rust SDK).
+//!
+//! Wire shape is identical to the Python reference implementation:
+//!   * `POST {base_url}/v1/messages`, headers `x-api-key`, `anthropic-version: 2026-10-21`,
+//!     `anthropic-beta: server-side-fallback-2026-07-01` (for `"fallbacks": "default"`).
+//!   * `model: claude-opus-5-5`, adaptive thinking (always on for this model), explicit `effort`.
+//!   * Structured outputs: `output_config.format = {type: json_schema, schema: <response schema>}`.
+//!   * Streaming (`stream: true`) because thinking + a large JSON document can take minutes.
+//!   * Server tools `web_search_20260209` / `web_fetch_20260209` when `allow_web_research`.
+//!   * `pause_turn` resumed by echoing the partial assistant turn; `refusal` / `max_tokens` surfaced.
+//!   * System prompt first with `cache_control` so repeated calls hit the prompt cache.
+
+use std::time::{Duration, Instant};
+
+use futures_util::StreamExt;
+use reqwest::StatusCode;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::checks::consistency_warnings;
+use crate::models::{validate_ranges, AnalysisRequest, AnalysisResponse};
+use crate::sse::{Message, MessageAccumulator, SseParser, StreamError};
+
+pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
+pub const DEFAULT_EFFORT: &str = "high"; // Opus 5.5 defaults to "medium"; set explicitly
+pub const DEFAULT_MAX_TOKENS: u32 = 64_000;
+pub const API_VERSION: &str = "2026-10-21";
+pub const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
+const MAX_PAUSE_RESUMES: usize = 6;
+const MAX_ATTEMPTS: u32 = 4; // per HTTP request, for 429 / 5xx / connection errors
+
+/// The system prompt and the response JSON Schema are compiled in from the repo root.
+pub const SYSTEM_PROMPT: &str = include_str!("../../prompts/system_prompt.md");
+pub const RESPONSE_SCHEMA_JSON: &str = include_str!("../../schema/analysis_response.schema.json");
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("HTTP transport error: {0}")]
+    Transport(#[from] reqwest::Error),
+    #[error("API error {status} ({error_type}): {message}{}", request_id.as_deref().map(|r| format!(" [request-id {r}]")).unwrap_or_default())]
+    Api {
+        status: u16,
+        error_type: String,
+        message: String,
+        request_id: Option<String>,
+    },
+    #[error("stream error: {0}")]
+    Stream(#[from] StreamError),
+    #[error("Claude declined the request (category={category:?}): {explanation:?}")]
+    Refused {
+        category: Option<String>,
+        explanation: Option<String>,
+    },
+    #[error("analysis incomplete: {0}")]
+    Incomplete(String),
+    #[error("response did not match AnalysisResponse: {0}")]
+    Parse(#[from] serde_json::Error),
+    #[error("response out of range: {0:?}")]
+    Range(Vec<String>),
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Usage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_input_tokens: u64,
+    pub cache_creation_input_tokens: u64,
+    pub web_search_requests: u64,
+    pub turns: u32,
+}
+
+impl Usage {
+    fn add(&mut self, u: &serde_json::Map<String, Value>) {
+        let g = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
+        self.input_tokens += g("input_tokens");
+        self.output_tokens += g("output_tokens");
+        self.cache_read_input_tokens += g("cache_read_input_tokens");
+        self.cache_creation_input_tokens += g("cache_creation_input_tokens");
+        self.web_search_requests += u
+            .get("server_tool_use")
+            .and_then(|s| s.get("web_search_requests"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        self.turns += 1;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalysisResult {
+    pub response: AnalysisResponse,
+    pub raw_json: String,
+    pub model: String,
+    pub usage: Usage,
+    pub warnings: Vec<String>,
+    pub elapsed: Duration,
+    pub request_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub api_key: String,
+    pub base_url: String,
+    pub model: String,
+    pub effort: String,
+    pub max_tokens: u32,
+    pub use_server_fallbacks: bool,
+    pub show_thinking_summary: bool,
+    pub system_prompt: String,
+}
+
+impl Config {
+    /// Reads `ANTHROPIC_API_KEY` (required) and `ANTHROPIC_BASE_URL` (optional).
+    pub fn from_env() -> anyhow::Result<Self> {
+        let api_key = std::env::var("ANTHROPIC_API_KEY")
+            .map_err(|_| anyhow::anyhow!("ANTHROPIC_API_KEY is not set"))?;
+        Ok(Self {
+            api_key,
+            base_url: std::env::var("ANTHROPIC_BASE_URL")
+                .unwrap_or_else(|_| DEFAULT_BASE_URL.into()),
+            model: DEFAULT_MODEL.into(),
+            effort: DEFAULT_EFFORT.into(),
+            max_tokens: DEFAULT_MAX_TOKENS,
+            use_server_fallbacks: true,
+            show_thinking_summary: false,
+            system_prompt: SYSTEM_PROMPT.into(),
+        })
+    }
+}
+
+pub struct FundamentalsClient {
+    http: reqwest::Client,
+    cfg: Config,
+    schema: Value,
+}
+
+pub fn web_tools() -> Vec<Value> {
+    vec![
+        json!({"type": "web_search_20260209", "name": "web_search", "max_uses": 15}),
+        json!({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10, "max_content_tokens": 60000}),
+    ]
+}
+
+/// The volatile part of the prompt; the system prompt stays byte-identical so it caches.
+pub fn build_user_message(req: &AnalysisRequest, today: &str) -> String {
+    let payload = serde_json::to_string_pretty(req).expect("request serialises");
+    let mut s = format!(
+        "Analysis date: {today}\nAnalyse the following request using the framework and return the structured result.\n\n```json\n{payload}\n```"
+    );
+    if !req.allow_web_research && req.supplied_data.is_none() {
+        s.push_str("\n\nWeb research is disabled and no data was supplied: use recall_only mode and cap reliability at 35.");
+    }
+    s
+}
+
+impl FundamentalsClient {
+    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+        let http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(30))
+            // The API sends `ping` events during long thinking; a long idle gap means trouble.
+            .read_timeout(Duration::from_secs(300))
+            .build()?;
+        let schema: Value = serde_json::from_str(RESPONSE_SCHEMA_JSON)?;
+        Ok(Self { http, cfg, schema })
+    }
+
+    pub fn from_env() -> anyhow::Result<Self> {
+        Self::new(Config::from_env()?)
+    }
+
+    /// Exposed for tests: the exact JSON body sent to `/v1/messages`.
+    pub fn build_body(&self, req: &AnalysisRequest, messages: &[Value]) -> Value {
+        let mut body = json!({
+            "model": self.cfg.model,
+            "max_tokens": self.cfg.max_tokens,
+            "stream": true,
+            "system": [{
+                "type": "text",
+                "text": self.cfg.system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }],
+            "output_config": {
+                "effort": self.cfg.effort,
+                "format": {"type": "json_schema", "schema": self.schema}
+            },
+            "messages": messages,
+        });
+        if self.cfg.show_thinking_summary {
+            body["thinking"] = json!({"type": "adaptive", "display": "summarized"});
+        }
+        if req.allow_web_research {
+            body["tools"] = Value::Array(web_tools());
+        }
+        if self.cfg.use_server_fallbacks {
+            body["fallbacks"] = json!("default");
+        }
+        body
+    }
+
+    fn beta_header(&self) -> Option<&'static str> {
+        self.cfg
+            .use_server_fallbacks
+            .then_some("server-side-fallback-2026-07-01")
+    }
+
+    pub async fn analyze(&self, req: &AnalysisRequest) -> Result<AnalysisResult, Error> {
+        let today = today_iso();
+        self.analyze_dated(req, &today).await
+    }
+
+    pub async fn analyze_dated(
+        &self,
+        req: &AnalysisRequest,
+        today: &str,
+    ) -> Result<AnalysisResult, Error> {
+        let started = Instant::now();
+        let mut messages = vec![json!({"role": "user", "content": build_user_message(req, today)})];
+        let mut usage = Usage::default();
+        let mut request_ids = Vec::new();
+        let mut final_msg: Option<Message> = None;
+
+        for _ in 0..=MAX_PAUSE_RESUMES {
+            let body = self.build_body(req, &messages);
+            let (msg, rid) = self.stream_message(&body).await?;
+            usage.add(&msg.usage);
+            if let Some(r) = rid {
+                request_ids.push(r);
+            }
+            if msg.stop_reason.as_deref() == Some("pause_turn") {
+                // Long server-tool turn paused: echo the partial assistant turn and resume.
+                messages.push(json!({"role": "assistant", "content": msg.content}));
+                continue;
+            }
+            final_msg = Some(msg);
+            break;
+        }
+        let msg = final_msg.ok_or_else(|| {
+            Error::Incomplete(format!(
+                "turn still paused after {MAX_PAUSE_RESUMES} resumes"
+            ))
+        })?;
+
+        match msg.stop_reason.as_deref() {
+            Some("refusal") => {
+                let d = msg.stop_details.as_ref();
+                return Err(Error::Refused {
+                    category: d
+                        .and_then(|d| d.get("category"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    explanation: d
+                        .and_then(|d| d.get("explanation"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                });
+            }
+            Some("max_tokens") => {
+                return Err(Error::Incomplete(
+                    "output hit max_tokens; raise max_tokens or narrow the request".into(),
+                ))
+            }
+            _ => {}
+        }
+        let text = msg.last_text().ok_or_else(|| {
+            Error::Incomplete(format!("no text block (stop_reason={:?})", msg.stop_reason))
+        })?;
+        let response: AnalysisResponse = serde_json::from_str(text)?;
+        let range = validate_ranges(&response);
+        if !range.is_empty() {
+            return Err(Error::Range(range));
+        }
+        let raw_json = serde_json::to_string_pretty(&response)?;
+        let warnings = consistency_warnings(&response);
+        Ok(AnalysisResult {
+            response,
+            raw_json,
+            model: msg.model,
+            usage,
+            warnings,
+            elapsed: started.elapsed(),
+            request_ids,
+        })
+    }
+
+    /// One streamed request with retries for 429 / 5xx / connection errors.
+    async fn stream_message(&self, body: &Value) -> Result<(Message, Option<String>), Error> {
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            match self.stream_once(body).await {
+                Ok(ok) => return Ok(ok),
+                Err(e) if attempt < MAX_ATTEMPTS && is_retryable(&e) => {
+                    let backoff = retry_after(&e)
+                        .unwrap_or_else(|| Duration::from_millis(500 * 2u64.pow(attempt)));
+                    eprintln!("retrying after {:?}: {e}", backoff);
+                    tokio::time::sleep(backoff).await;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    async fn stream_once(&self, body: &Value) -> Result<(Message, Option<String>), Error> {
+        let url = format!("{}/v1/messages", self.cfg.base_url.trim_end_matches('/'));
+        let mut rb = self
+            .http
+            .post(&url)
+            .header("content-type", "application/json")
+            .header("accept", "text/event-stream")
+            .header("x-api-key", &self.cfg.api_key)
+            .header("anthropic-version", API_VERSION)
+            .json(body);
+        if let Some(b) = self.beta_header() {
+            rb = rb.header("anthropic-beta", b);
+        }
+        let resp = rb.send().await?;
+        let request_id = resp
+            .headers()
+            .get("request-id")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let status = resp.status();
+        if !status.is_success() {
+            let retry_hdr = resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok());
+            let text = resp.text().await.unwrap_or_default();
+            let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+            let mut message = v["error"]["message"].as_str().unwrap_or(&text).to_string();
+            if let Some(s) = retry_hdr {
+                message.push_str(&format!(" (retry-after {s}s)"));
+            }
+            return Err(Error::Api {
+                status: status.as_u16(),
+                error_type: v["error"]["type"].as_str().unwrap_or("unknown").to_string(),
+                message,
+                request_id,
+            });
+        }
+
+        let mut parser = SseParser::default();
+        let mut acc = MessageAccumulator::default();
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            parser.push(&chunk?);
+            while let Some(ev) = parser.next_event() {
+                acc.apply(&ev)?;
+            }
+        }
+        if !acc.is_done() {
+            return Err(Error::Incomplete("stream ended before message_stop".into()));
+        }
+        Ok((acc.message, request_id))
+    }
+}
+
+fn is_retryable(e: &Error) -> bool {
+    match e {
+        Error::Transport(err) => err.is_connect() || err.is_timeout() || err.is_request(),
+        Error::Api { status, .. } => {
+            *status == StatusCode::TOO_MANY_REQUESTS.as_u16()
+                || *status == StatusCode::REQUEST_TIMEOUT.as_u16()
+                || *status == StatusCode::CONFLICT.as_u16()
+                || *status >= 500
+        }
+        Error::Stream(StreamError::ApiError(v)) => v["type"].as_str() == Some("overloaded_error"),
+        Error::Incomplete(msg) => msg.contains("before message_stop"),
+        _ => false,
+    }
+}
+
+fn retry_after(e: &Error) -> Option<Duration> {
+    if let Error::Api { message, .. } = e {
+        let s = message.rsplit("(retry-after ").next()?.strip_suffix("s)")?;
+        return s
+            .parse::<u64>()
+            .ok()
+            .map(|n| Duration::from_secs(n.min(120)));
+    }
+    None
+}
+
+/// UTC date as YYYY-MM-DD without pulling in a date crate.
+pub fn today_iso() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let days = (secs / 86_400) as i64;
+    // Civil-from-days (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}")
+}
