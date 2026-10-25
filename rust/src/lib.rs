@@ -12,8 +12,8 @@ pub mod sse;
 
 pub use checks::consistency_warnings;
 pub use client::{
-    build_user_content, build_user_message, stderr_progress, AnalysisResult, Config, Error,
-    FundamentalsClient, ProbeOutcome, ProgressSink, Usage,
+    build_user_content, build_user_message, file_ids_in, stderr_progress, AnalysisResult, Config,
+    Error, FundamentalsClient, ProbeOutcome, ProgressSink, Usage,
 };
 pub use merge::merge_incremental;
 pub use models::{

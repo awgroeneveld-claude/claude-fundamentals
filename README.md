@@ -212,6 +212,15 @@ Why each piece:
   and 24 optional fields, with undocumented internal size limits on top). Until that is resolved
   with Anthropic support, keep the default. The schema is still kept within the documented
   budget by tests in both languages so enforcement can be switched on without changes.
+* **Sandbox output (default).** The first live run showed the model doing all arithmetic in the
+  code-execution sandbox that the web tools provide, then re-typing the 86 KB JSON as output text:
+  130k output tokens, of which the document itself was about two thirds, plus the risk of a typo
+  in a retyped number. Both clients now declare `code_execution_20260521` explicitly and ask the
+  model to build and validate the JSON in the sandbox, copy it to `$OUTPUT_DIR`, and reply with
+  one line. The file comes back with a `file_id` in the tool result and the client downloads it
+  through the Files API. Code execution is free when the web tools are in the request. If no file
+  comes back the client falls back to parsing the text block. `--no-sandbox-output` restores the
+  typed-output path. **Not yet verified live**; the first run after this change should be watched.
 * **Prompt caching.** The system prompt is ~2.5k tokens and byte-identical across calls, so it is
   marked for caching and the volatile request goes in the user message after it. Check
   `usage.cache_read_input_tokens` on the second call.
@@ -444,11 +453,15 @@ tests/                                  Python offline tests
 
 ## 9. Status and open items
 
-Verified live: the Rust CLI completed an ASML web-research run and produced a 40 KB response that
-parsed through the strict types, with the schema in the prompt rather than API-enforced. Verified
-offline: both clients pass their test suites and produce byte-for-byte the intended request body.
-**Open:** API-side schema enforcement fails on grammar size (see "How the call is made"); the
-report renderer has been exercised on the hand-built sample, not yet on a live response.
+Verified live (Rust CLI, Sonnet 5.5, prompt-embedded schema): ASML (40 KB) and Volvo Cars
+(139 KB: 31 measures, 8 quarterly series, 8-point signal history, EUR base view, 26-chart report)
+both parsed through the strict types with one consistency warning, since fixed. Runtime 15 min,
+8 searches, 131k output tokens for Volvo Cars. Verified offline: both test suites pass.
+**Open:** API-side schema enforcement fails on grammar size even for a five-field control schema
+in the probe (next step is the pruned probe table, then Anthropic support); the model dropped
+about half the catalogue "to keep the output compact" (now forbidden in the prompt, to be
+confirmed on the next run); sandbox file output and incremental delta runs are implemented and
+tested offline but not yet exercised live.
 
 Open decisions for you:
 

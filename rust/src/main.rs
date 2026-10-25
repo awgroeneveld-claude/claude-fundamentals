@@ -51,6 +51,9 @@ enum Cmd {
         /// Previous result JSON for this symbol: run incrementally (delta) and merge into it
         #[arg(long)]
         previous: Option<PathBuf>,
+        /// Have the model type the JSON as output text instead of handing back a sandbox file
+        #[arg(long)]
+        no_sandbox_output: bool,
     },
     /// Validate a saved response and print consistency warnings (offline)
     Check { file: PathBuf },
@@ -177,6 +180,7 @@ async fn main() -> anyhow::Result<()> {
             report,
             quiet,
             previous,
+            no_sandbox_output,
         } => {
             let text = std::fs::read_to_string(&request)
                 .with_context(|| format!("reading {}", request.display()))?;
@@ -199,6 +203,7 @@ async fn main() -> anyhow::Result<()> {
             cfg.max_tokens = max_tokens;
             cfg.use_server_fallbacks = !no_fallbacks;
             cfg.enforce_schema = enforce_schema;
+            cfg.sandbox_output = !no_sandbox_output;
             if !quiet {
                 cfg.progress = Some(fundamentals_client::stderr_progress());
                 eprintln!(

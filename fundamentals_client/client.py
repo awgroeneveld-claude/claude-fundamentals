@@ -44,6 +44,15 @@ DEFAULT_MAX_TOKENS = 64_000  # thinking + JSON; streaming so timeouts are not a 
 MAX_PAUSE_RESUMES = 6
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "system_prompt.md"
 
+CODE_EXECUTION_TOOL: dict[str, Any] = {"type": "code_execution_20260521", "name": "code_execution"}
+SANDBOX_OUTPUT_INSTRUCTION = (
+    "Output delivery: build the final JSON object in the code-execution sandbox (compute every figure in "
+    "Python, assemble the document, check it against the schema, and json.dump it to /tmp/analysis.json). "
+    'Then run one bash command: cp /tmp/analysis.json "$OUTPUT_DIR/" && ls -l "$OUTPUT_DIR". The caller '
+    "downloads that file. Your final reply must then be only the line FILE: analysis.json, with no JSON in "
+    "the text. If the sandbox is unavailable, return the JSON object as text instead."
+)
+
 WEB_TOOLS: list[dict[str, Any]] = [
     {"type": "web_search_20260209", "name": "web_search", "max_uses": 15},
     {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10, "max_content_tokens": 60_000},
@@ -173,6 +182,7 @@ class FundamentalsClient:
         show_thinking_summary: bool = False,
         enforce_schema: bool = False,
         progress: Callable[[str], None] | None = None,
+        sandbox_output: bool = True,
     ):
         """`enforce_schema=False` (default) puts the schema in the system prompt and validates the reply
         client-side. `True` also sends it as `output_config.format` so the API constrains decoding;
@@ -186,6 +196,9 @@ class FundamentalsClient:
         self.show_thinking_summary = show_thinking_summary
         self.enforce_schema = enforce_schema
         self.progress = progress  # called with a one-line notice per search / fetch / output milestone
+        # Build + validate the JSON in the code-execution sandbox and hand it back as a file (Files API)
+        # instead of re-typing it as output text; falls back to the text block when no file comes back.
+        self.sandbox_output = sandbox_output
         if not enforce_schema:
             from anthropic.lib._parse._transform import transform_schema
 
@@ -235,10 +248,16 @@ class FundamentalsClient:
     ) -> AnalysisResult:
         """`image_base_dir` resolves relative `images[].path` entries (the CLI passes the request file's dir)."""
         today = today or time.strftime("%Y-%m-%d")
-        messages: list[dict[str, Any]] = [
-            {"role": "user", "content": build_user_content(req, today, image_base_dir)}
-        ]
-        tools = WEB_TOOLS if req.allow_web_research else []
+        content = build_user_content(req, today, image_base_dir)
+        if self.sandbox_output:
+            if isinstance(content, str):
+                content += "\n\n" + SANDBOX_OUTPUT_INSTRUCTION
+            else:
+                content[-1]["text"] += "\n\n" + SANDBOX_OUTPUT_INSTRUCTION
+        messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
+        tools = list(WEB_TOOLS) if req.allow_web_research else []
+        if self.sandbox_output:
+            tools.append(CODE_EXECUTION_TOOL)
 
         kwargs: dict[str, Any] = dict(
             model=self.model,
@@ -291,6 +310,14 @@ class FundamentalsClient:
 
         parsed: AnalysisResponse | None = getattr(final, "parsed_output", None)
         text_blocks = [b for b in final.content if b.type == "text"]
+        if self.sandbox_output:
+            for fid in file_ids_in(final.content):
+                if self.progress:
+                    self.progress(f"sandbox file {fid}")
+                meta = self.client.files.retrieve_metadata(fid)
+                if str(getattr(meta, "filename", "")).endswith(".json"):
+                    data = self.client.files.download(fid).read()
+                    parsed = AnalysisResponse.model_validate_json(data)
         if parsed is None:
             if not text_blocks:
                 raise AnalysisIncomplete(f"no text block in final message (stop_reason={final.stop_reason})")
@@ -307,6 +334,29 @@ class FundamentalsClient:
             elapsed_s=time.monotonic() - started,
             request_ids=request_ids,
         )
+
+
+def file_ids_in(content: Iterable[Any]) -> list[str]:
+    """Every file_id in code-execution tool results, in order (SDK objects or plain dicts)."""
+    out: list[str] = []
+
+    def walk(v: Any) -> None:
+        if isinstance(v, dict):
+            fid = v.get("file_id")
+            if isinstance(fid, str) and fid not in out:
+                out.append(fid)
+            for c in v.values():
+                walk(c)
+        elif isinstance(v, list):
+            for c in v:
+                walk(c)
+
+    for block in content:
+        d = block if isinstance(block, dict) else (block.model_dump() if hasattr(block, "model_dump") else {})
+        t = str(d.get("type", ""))
+        if t.startswith(("bash_code_execution", "code_execution", "text_editor_code_execution")):
+            walk(d)
+    return out
 
 
 def _strip_fences(text: str) -> str:

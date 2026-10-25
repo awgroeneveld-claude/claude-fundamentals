@@ -24,6 +24,7 @@ fn cfg() -> Config {
         system_prompt: fundamentals_client::client::SYSTEM_PROMPT.into(),
         enforce_schema: true,
         progress: None,
+        sandbox_output: false,
     }
 }
 
@@ -355,7 +356,7 @@ fn probe_variants_are_valid_subsets() {
     let vs = variants(&full);
     assert!(vs.len() >= 10);
     let full_len = serde_json::to_string(&full).unwrap().len();
-    for v in &vs[1..] {
+    for v in vs.iter().filter(|v| v.name != "full") {
         let len = serde_json::to_string(&v.schema).unwrap().len();
         assert!(
             len < full_len,
@@ -558,5 +559,43 @@ fn incremental_merge_adds_without_rewriting() {
         consistency_warnings(&merged).is_empty(),
         "{:?}",
         consistency_warnings(&merged)
+    );
+}
+
+#[test]
+fn file_ids_are_extracted_from_tool_results() {
+    let content = vec![
+        json!({"type": "text", "text": "FILE: analysis.json", "file_id": "not-a-tool-result"}),
+        json!({"type": "bash_code_execution_tool_result", "tool_use_id": "x", "content": {
+            "type": "bash_code_execution_result", "stdout": "", "stderr": "", "return_code": 0,
+            "content": [{"type": "code_execution_output", "file_id": "file_abc"}, {"type": "code_execution_output", "file_id": "file_def"}]}}),
+        json!({"type": "web_fetch_tool_result", "content": {"type": "web_fetch_result", "url": "u", "content": {"type": "document", "source": {"type": "text", "data": "x"}, "file_id": "file_zzz"}}}),
+    ];
+    assert_eq!(
+        fundamentals_client::file_ids_in(&content),
+        vec!["file_abc", "file_def"]
+    );
+}
+
+#[test]
+fn sandbox_mode_adds_code_execution_and_instruction() {
+    let mut c = cfg();
+    c.sandbox_output = true;
+    let client = FundamentalsClient::new(c).unwrap();
+    let req = AnalysisRequest::new("X", "2020-01-01", "2024-12-31");
+    let body = client.build_body(&req, &[]);
+    let tools: Vec<&str> = body["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["type"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        tools,
+        [
+            "web_search_20260209",
+            "web_fetch_20260209",
+            "code_execution_20260521"
+        ]
     );
 }

@@ -131,6 +131,11 @@ pub struct Config {
     pub enforce_schema: bool,
     /// Optional progress sink; `stderr_progress()` prints to stderr. None = silent.
     pub progress: Option<ProgressSink>,
+    /// Ask the model to build and validate the JSON in the code-execution sandbox and hand it back
+    /// as a file (downloaded via the Files API) instead of re-typing it as output text. Cuts output
+    /// tokens by most of the document size and removes transcription risk. Falls back to the text
+    /// block when no file comes back.
+    pub sandbox_output: bool,
 }
 
 impl std::fmt::Debug for Config {
@@ -144,6 +149,7 @@ impl std::fmt::Debug for Config {
             .field("show_thinking_summary", &self.show_thinking_summary)
             .field("enforce_schema", &self.enforce_schema)
             .field("progress", &self.progress.is_some())
+            .field("sandbox_output", &self.sandbox_output)
             .finish_non_exhaustive()
     }
 }
@@ -165,6 +171,7 @@ impl Config {
             system_prompt: SYSTEM_PROMPT.into(),
             enforce_schema: false,
             progress: None,
+            sandbox_output: true,
         })
     }
 }
@@ -174,6 +181,11 @@ pub struct FundamentalsClient {
     cfg: Config,
     schema: Value,
 }
+
+pub const CODE_EXECUTION_TOOL: &str = "code_execution_20260521";
+
+/// Instruction appended to the user message in sandbox-output mode.
+pub const SANDBOX_OUTPUT_INSTRUCTION: &str = "Output delivery: build the final JSON object in the code-execution sandbox (compute every figure in Python, assemble the document, check it against the schema, and json.dump it to /tmp/analysis.json). Then run one bash command: cp /tmp/analysis.json \"$OUTPUT_DIR/\" && ls -l \"$OUTPUT_DIR\". The caller downloads that file. Your final reply must then be only the line FILE: analysis.json, with no JSON in the text. If the sandbox is unavailable, return the JSON object as text instead.";
 
 pub fn web_tools() -> Vec<Value> {
     vec![
@@ -317,8 +329,16 @@ impl FundamentalsClient {
         if self.cfg.show_thinking_summary {
             body["thinking"] = json!({"type": "adaptive", "display": "summarized"});
         }
-        if req.allow_web_research {
-            body["tools"] = Value::Array(web_tools());
+        let mut tools = if req.allow_web_research {
+            web_tools()
+        } else {
+            vec![]
+        };
+        if self.cfg.sandbox_output {
+            tools.push(json!({"type": CODE_EXECUTION_TOOL, "name": "code_execution"}));
+        }
+        if !tools.is_empty() {
+            body["tools"] = Value::Array(tools);
         }
         if self.cfg.use_server_fallbacks {
             body["fallbacks"] = json!("default");
@@ -346,7 +366,10 @@ impl FundamentalsClient {
         image_base_dir: Option<&Path>,
     ) -> Result<AnalysisResult, Error> {
         let started = Instant::now();
-        let content = build_user_content(req, today, image_base_dir)?;
+        let mut content = build_user_content(req, today, image_base_dir)?;
+        if self.cfg.sandbox_output {
+            append_text(&mut content, SANDBOX_OUTPUT_INSTRUCTION);
+        }
         let mut messages = vec![json!({"role": "user", "content": content})];
         let mut usage = Usage::default();
         let mut request_ids = Vec::new();
@@ -394,9 +417,37 @@ impl FundamentalsClient {
             }
             _ => {}
         }
-        let text = msg.last_text().ok_or_else(|| {
-            Error::Incomplete(format!("no text block (stop_reason={:?})", msg.stop_reason))
-        })?;
+        let mut json_text: Option<String> = None;
+        if self.cfg.sandbox_output {
+            for fid in file_ids_in(&msg.content) {
+                if let Some(sink) = &self.cfg.progress {
+                    sink(&Progress::ToolResult {
+                        name: "sandbox file".into(),
+                        detail: fid.clone(),
+                    });
+                }
+                let (name, bytes) = self.download_file(&fid).await?;
+                if name.ends_with(".json") {
+                    json_text = Some(String::from_utf8_lossy(&bytes).into_owned());
+                }
+            }
+        }
+        let owned_text;
+        let text: &str = match &json_text {
+            Some(t) => t.as_str(),
+            None => {
+                owned_text = msg
+                    .last_text()
+                    .ok_or_else(|| {
+                        Error::Incomplete(format!(
+                            "no text block (stop_reason={:?})",
+                            msg.stop_reason
+                        ))
+                    })?
+                    .to_string();
+                owned_text.as_str()
+            }
+        };
         let response: AnalysisResponse = serde_json::from_str(strip_fences(text))?;
         let range = validate_ranges(&response);
         if !range.is_empty() {
@@ -555,6 +606,96 @@ impl FundamentalsClient {
             message,
             request_id: None,
         })
+    }
+}
+
+impl FundamentalsClient {
+    /// Download a Files API file: returns (filename, bytes).
+    async fn download_file(&self, file_id: &str) -> Result<(String, Vec<u8>), Error> {
+        let base = self.cfg.base_url.trim_end_matches('/');
+        let meta = self
+            .http
+            .get(format!("{base}/v1/files/{file_id}"))
+            .header("x-api-key", &self.cfg.api_key)
+            .header("anthropic-version", API_VERSION)
+            .send()
+            .await?;
+        let name = if meta.status().is_success() {
+            meta.json::<Value>()
+                .await
+                .ok()
+                .and_then(|v| v["filename"].as_str().map(str::to_string))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let resp = self
+            .http
+            .get(format!("{base}/v1/files/{file_id}/content"))
+            .header("x-api-key", &self.cfg.api_key)
+            .header("anthropic-version", API_VERSION)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            return Err(Error::Api {
+                status: resp.status().as_u16(),
+                error_type: "file_download".into(),
+                message: format!("could not download {file_id}"),
+                request_id: None,
+            });
+        }
+        Ok((name, resp.bytes().await?.to_vec()))
+    }
+}
+
+/// Every `file_id` that appears in code-execution tool results, in order of appearance.
+pub fn file_ids_in(content: &[Value]) -> Vec<String> {
+    fn walk(v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::Object(o) => {
+                if let Some(id) = o.get("file_id").and_then(Value::as_str) {
+                    if !out.iter().any(|x| x == id) {
+                        out.push(id.to_string());
+                    }
+                }
+                o.values().for_each(|c| walk(c, out));
+            }
+            Value::Array(a) => a.iter().for_each(|c| walk(c, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for block in content {
+        let t = block.get("type").and_then(Value::as_str).unwrap_or("");
+        if t.starts_with("bash_code_execution")
+            || t.starts_with("code_execution")
+            || t.starts_with("text_editor_code_execution")
+        {
+            walk(block, &mut out);
+        }
+    }
+    out
+}
+
+fn append_text(content: &mut Value, extra: &str) {
+    match content {
+        Value::String(s) => {
+            s.push_str("\n\n");
+            s.push_str(extra);
+        }
+        Value::Array(blocks) => {
+            if let Some(last) = blocks
+                .iter_mut()
+                .rev()
+                .find(|b| b.get("type").and_then(Value::as_str) == Some("text"))
+            {
+                if let Some(Value::String(t)) = last.get_mut("text") {
+                    t.push_str("\n\n");
+                    t.push_str(extra);
+                }
+            }
+        }
+        _ => {}
     }
 }
 

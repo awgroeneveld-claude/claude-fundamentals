@@ -66,6 +66,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         max_tokens=args.max_tokens,
         enforce_schema=args.enforce_schema,
         progress=progress,
+        sandbox_output=not args.no_sandbox_output,
     )
     try:
         result = client.analyze(req, image_base_dir=Path(args.request).resolve().parent)
@@ -136,6 +137,11 @@ def main(argv: list[str] | None = None) -> int:
         help="also send the schema as output_config.format (API-side grammar); off by default, see README",
     )
     a.add_argument("--previous", help="previous result JSON for this symbol: run incrementally and merge")
+    a.add_argument(
+        "--no-sandbox-output",
+        action="store_true",
+        help="have the model type the JSON as output text instead of handing back a sandbox file",
+    )
     a.add_argument("--quiet", action="store_true", help="suppress the progress log on stderr")
     a.set_defaults(fn=cmd_analyze)
 

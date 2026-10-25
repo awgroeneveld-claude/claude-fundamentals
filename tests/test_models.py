@@ -182,3 +182,14 @@ def test_incremental_merge_adds_without_rewriting():
     assert [sp.period_end for sp in merged.signal_history][-2:] == ["2024-12-31", "2025-12-31"]
     assert merged.analysis_date == "2027-03-01"
     assert consistency_warnings(merged) == []
+
+
+def test_file_ids_in_tool_results():
+    from fundamentals_client.client import file_ids_in
+
+    content = [
+        {"type": "text", "text": "FILE: analysis.json", "file_id": "nope"},
+        {"type": "bash_code_execution_tool_result", "content": {"type": "bash_code_execution_result",
+         "content": [{"type": "code_execution_output", "file_id": "file_abc"}]}},
+    ]
+    assert file_ids_in(content) == ["file_abc"]
