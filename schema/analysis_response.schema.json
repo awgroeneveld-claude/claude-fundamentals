@@ -30,15 +30,13 @@
       "type": "object",
       "title": "Context",
       "properties": {
+        "requested": {
+          "type": "boolean",
+          "description": "false when the context category was not requested; other fields then empty/0",
+          "title": "Requested"
+        },
         "industry": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
           "title": "Industry"
         },
         "peer_set_used": {
@@ -49,48 +47,20 @@
           }
         },
         "segment_notes": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
           "title": "Segment Notes"
         },
         "management_commentary": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
           "title": "Management Commentary"
         },
         "dividend_policy": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
           "title": "Dividend Policy"
         },
         "accounting_flags": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Restatements, auditor notes, off-balance-sheet items",
+          "type": "string",
+          "description": "Restatements, auditor notes, off-balance-sheet items; empty if none",
           "title": "Accounting Flags"
         },
         "reliability_pct": {
@@ -101,6 +71,7 @@
       },
       "additionalProperties": false,
       "required": [
+        "requested",
         "industry",
         "peer_set_used",
         "segment_notes",
@@ -115,14 +86,9 @@
       "title": "DataGap",
       "properties": {
         "measure_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MeasureId"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "description": "A measure id from the catalogue, or empty string for a general gap",
+          "title": "Measure Id"
         },
         "description": {
           "type": "string",
@@ -238,14 +204,8 @@
           "title": "Holder Type"
         },
         "as_of": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
+          "description": "ISO date of the holding snapshot; empty if unknown",
           "title": "As Of"
         },
         "reliability_pct": {
@@ -312,27 +272,12 @@
           "$ref": "#/$defs/Unit"
         },
         "currency": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "ISO 4217 when unit is currency/per_share, else null",
+          "type": "string",
+          "description": "ISO 4217 when unit is currency/per_share, else empty string",
           "title": "Currency"
         },
         "scale": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Scale"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Scale for currency amounts, null otherwise"
+          "$ref": "#/$defs/Scale"
         },
         "latest": {
           "$ref": "#/$defs/DataPoint"
@@ -359,14 +304,8 @@
           "title": "Reliability Basis"
         },
         "notes": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
+          "description": "Caveats, failed F-Score tests, discrepancies; empty if none",
           "title": "Notes"
         }
       },
@@ -404,6 +343,11 @@
       "type": "object",
       "title": "Ownership",
       "properties": {
+        "requested": {
+          "type": "boolean",
+          "description": "false when the ownership category was not requested; other fields then empty/0",
+          "title": "Requested"
+        },
         "top_holders": {
           "type": "array",
           "title": "Top Holders",
@@ -412,15 +356,8 @@
           }
         },
         "recent_insider_activity": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Summary of buys/sells in the period, or null",
+          "type": "string",
+          "description": "Summary of buys/sells in the period; empty if none/unknown",
           "title": "Recent Insider Activity"
         },
         "reliability_pct": {
@@ -429,19 +366,13 @@
           "description": "{maximum: 100, minimum: 0}"
         },
         "notes": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
           "title": "Notes"
         }
       },
       "additionalProperties": false,
       "required": [
+        "requested",
         "top_holders",
         "recent_insider_activity",
         "reliability_pct",
@@ -539,7 +470,8 @@
         "units",
         "thousands",
         "millions",
-        "billions"
+        "billions",
+        "not_applicable"
       ],
       "title": "Scale"
     },
@@ -633,38 +565,18 @@
           "title": "Title"
         },
         "url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
+          "description": "URL, or empty string for supplied input / recall",
           "title": "Url"
         },
         "period_covered": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "e.g. 'FY2024 10-K', 'as of 2025-09-30'",
+          "type": "string",
+          "description": "e.g. 'FY2024 10-K', 'as of 2025-09-30'; empty if unknown",
           "title": "Period Covered"
         },
         "retrieved_at": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "ISO date when the page was fetched, or null for supplied/recall",
+          "type": "string",
+          "description": "ISO date the page was fetched; empty for supplied/recall",
           "title": "Retrieved At"
         }
       },
@@ -847,14 +759,8 @@
       "title": "Symbol"
     },
     "company_name": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
+      "type": "string",
+      "description": "Empty string if unknown",
       "title": "Company Name"
     },
     "analysis_date": {
@@ -880,24 +786,10 @@
       }
     },
     "ownership": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Ownership"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/$defs/Ownership"
     },
     "context": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Context"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/$defs/Context"
     },
     "pillars": {
       "type": "array",

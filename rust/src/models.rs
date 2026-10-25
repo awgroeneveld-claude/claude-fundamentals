@@ -126,7 +126,8 @@ str_enum!(Scale {
     Units,
     Thousands,
     Millions,
-    Billions
+    Billions,
+    NotApplicable
 });
 str_enum!(Method {
     Reported,
@@ -346,9 +347,10 @@ pub struct Source {
     #[serde(rename = "type")]
     pub source_type: SourceType,
     pub title: String,
-    pub url: Option<String>,
-    pub period_covered: Option<String>,
-    pub retrieved_at: Option<String>,
+    /// Empty string for supplied input / recall.
+    pub url: String,
+    pub period_covered: String,
+    pub retrieved_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -382,14 +384,15 @@ pub struct Measure {
     pub category: Category,
     pub label: String,
     pub unit: Unit,
-    pub currency: Option<String>,
-    pub scale: Option<Scale>,
+    /// ISO 4217 for currency / per_share units, otherwise empty.
+    pub currency: String,
+    pub scale: Scale,
     pub latest: DataPoint,
     pub series: Vec<DataPoint>,
     pub trend: Trend,
     pub reliability_pct: u8,
     pub reliability_basis: String,
-    pub notes: Option<String>,
+    pub notes: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -398,7 +401,7 @@ pub struct Holder {
     pub name: String,
     pub pct_of_shares: Option<f64>,
     pub holder_type: HolderType,
-    pub as_of: Option<String>,
+    pub as_of: String,
     pub reliability_pct: u8,
     pub source_ids: Vec<String>,
 }
@@ -406,21 +409,25 @@ pub struct Holder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Ownership {
+    /// false when the ownership category was not requested (other fields empty / 0).
+    pub requested: bool,
     pub top_holders: Vec<Holder>,
-    pub recent_insider_activity: Option<String>,
+    pub recent_insider_activity: String,
     pub reliability_pct: u8,
-    pub notes: Option<String>,
+    pub notes: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Context {
-    pub industry: Option<String>,
+    /// false when the context category was not requested (other fields empty / 0).
+    pub requested: bool,
+    pub industry: String,
     pub peer_set_used: Vec<String>,
-    pub segment_notes: Option<String>,
-    pub management_commentary: Option<String>,
-    pub dividend_policy: Option<String>,
-    pub accounting_flags: Option<String>,
+    pub segment_notes: String,
+    pub management_commentary: String,
+    pub dividend_policy: String,
+    pub accounting_flags: String,
     pub reliability_pct: u8,
 }
 
@@ -471,7 +478,8 @@ pub struct SignalBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DataGap {
-    pub measure_id: Option<MeasureId>,
+    /// A catalogue id, or empty string for a general gap.
+    pub measure_id: String,
     pub description: String,
 }
 
@@ -480,13 +488,14 @@ pub struct DataGap {
 pub struct AnalysisResponse {
     pub schema_version: String,
     pub symbol: String,
-    pub company_name: Option<String>,
+    /// Empty if unknown.
+    pub company_name: String,
     pub analysis_date: String,
     pub data_mode: DataMode,
     pub sources: Vec<Source>,
     pub measures: Vec<Measure>,
-    pub ownership: Option<Ownership>,
-    pub context: Option<Context>,
+    pub ownership: Ownership,
+    pub context: Context,
     pub pillars: Vec<Pillar>,
     pub trend_summary: TrendSummary,
     pub signal: SignalBlock,

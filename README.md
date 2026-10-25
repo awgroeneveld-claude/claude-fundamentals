@@ -72,14 +72,14 @@ validation. The Python CLI has `--yaml` for that.
 
 ```
 schema_version, symbol, company_name, analysis_date, data_mode (supplied|retrieved|mixed|recall_only),
-sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|supplied_screenshot|web_other|model_recall), title, url, period_covered, retrieved_at
+sources[]        id, type (primary_filing|company_ir|aggregator|supplied_input|supplied_screenshot|web_other|model_recall), title, url, period_covered, retrieved_at  ("" when n/a)
 measures[]       measure_id, category, label, unit, currency, scale,
                  latest {period_end, period_type, value|null, reliability_pct, method, source_ids[]},
                  series[] (same shape, oldest first),
                  trend {direction, cagr_pct, latest_yoy_change_pct, coefficient_of_variation, vs_own_history, vs_peers, reliability_pct, comment},
                  reliability_pct, reliability_basis, notes
-ownership        top_holders[], recent_insider_activity, reliability_pct   (null when not requested)
-context          industry, peer_set_used, segment_notes, ..., reliability_pct (null when not requested)
+ownership        requested, top_holders[], recent_insider_activity, reliability_pct, notes   (requested=false when not asked for)
+context          requested, industry, peer_set_used, segment_notes, ..., reliability_pct   (requested=false when not asked for)
 pillars[]        valuation | profitability_stability | debt_health | earnings_quality | trends:
                  assessment, score_0_100, key_measures[], rationale, reliability_pct
 trend_summary    overall_direction, improving[], stable[], deteriorating[], inflections[], operating_vs_non_operating, reliability_pct
@@ -149,11 +149,15 @@ Why each piece:
   HTTP timeouts. The Rust client parses the SSE events itself (`rust/src/sse.rs`).
 * **Structured outputs.** The checked-in schema is sent on every call. The first call with a new
   schema pays a one-time compilation cost; after that it is cached for 24 h. The API compiles the
-  schema into a decoding grammar with a size limit: the first live run hit it (`400 The compiled
-  grammar is too large`) because the 80-value measure-id enum was referenced from six places. On
-  the wire `measure_id` is therefore a plain string; the catalogue lives in the system prompt and
-  membership is enforced client-side when the response is parsed. If the limit is ever hit again,
-  pass `--no-schema-enforcement` (both CLIs; `enforce_schema=false` / `Config.enforce_schema`): the
+  schema into a decoding grammar with hard limits: at most 16 union-typed fields (any `anyOf`,
+  which is what every nullable `X | null` becomes) and 24 optional fields per request, and unions
+  compile exponentially. The first live runs hit the limit (`400 The compiled grammar is too
+  large`). The schema is therefore built to a rule, enforced by tests in both languages: **only five
+  numeric fields are nullable** (a data point's `value`, the three trend statistics, a holder's
+  `pct_of_shares`); absent text is the empty string; `ownership` and `context` are always present
+  with a `requested` flag; `measure_id` is a plain string on the wire with the catalogue in the
+  prompt and membership checked client-side. If the limit is ever hit again, pass
+  `--no-schema-enforcement` (both CLIs; `enforce_schema=false` / `Config.enforce_schema`): the
   schema then goes into the system prompt instead of `output_config.format`, and the reply is
   validated client-side only.
 * **Prompt caching.** The system prompt is ~2.5k tokens and byte-identical across calls, so it is

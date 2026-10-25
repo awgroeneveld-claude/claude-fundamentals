@@ -9,9 +9,9 @@
       "id": "S1",
       "type": "supplied_input",
       "title": "Caller-supplied statements: audited annual reports via internal data warehouse",
-      "url": null,
+      "url": "",
       "period_covered": "FY2021-FY2024, GBP millions",
-      "retrieved_at": null
+      "retrieved_at": ""
     }
   ],
   "measures": [
@@ -86,15 +86,15 @@
       },
       "reliability_pct": 100,
       "reliability_basis": "Read directly from supplied_data (audited annual reports); period and units match.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "operating_margin",
       "category": "profitability",
       "label": "Operating margin",
       "unit": "percent",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -159,15 +159,15 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "net_margin",
       "category": "profitability",
       "label": "Net profit margin",
       "unit": "percent",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -232,15 +232,15 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "debt_to_equity",
       "category": "leverage",
       "label": "Debt-to-equity",
       "unit": "ratio",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -305,15 +305,15 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "interest_coverage",
       "category": "leverage",
       "label": "Interest coverage (EBIT / interest)",
       "unit": "ratio",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -378,15 +378,15 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "net_debt_to_ebitda",
       "category": "leverage",
       "label": "Net debt / EBITDA",
       "unit": "ratio",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -514,7 +514,7 @@
       },
       "reliability_pct": 100,
       "reliability_basis": "Read directly from supplied_data (audited annual reports); period and units match.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "free_cash_flow",
@@ -587,15 +587,15 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     },
     {
       "measure_id": "cash_conversion",
       "category": "cash_flow_quality",
       "label": "Cash conversion (OCF / net income)",
       "unit": "ratio",
-      "currency": null,
-      "scale": null,
+      "currency": "",
+      "scale": "not_applicable",
       "latest": {
         "period_end": "2024-12-31",
         "period_type": "FY",
@@ -660,11 +660,26 @@
       },
       "reliability_pct": 92,
       "reliability_basis": "Derived arithmetically from supplied figures rated 100; derivation band 80-94.",
-      "notes": null
+      "notes": ""
     }
   ],
-  "ownership": null,
-  "context": null,
+  "ownership": {
+    "requested": false,
+    "top_holders": [],
+    "recent_insider_activity": "",
+    "reliability_pct": 0,
+    "notes": ""
+  },
+  "context": {
+    "requested": false,
+    "industry": "",
+    "peer_set_used": [],
+    "segment_notes": "",
+    "management_commentary": "",
+    "dividend_policy": "",
+    "accounting_flags": "",
+    "reliability_pct": 0
+  },
   "pillars": [
     {
       "pillar": "valuation",
@@ -789,7 +804,7 @@
       "description": "No depreciation/amortisation in supplied_data; cannot compute EBITDA."
     },
     {
-      "measure_id": null,
+      "measure_id": "",
       "description": "Valuation category not requested; no price, market cap or share count supplied."
     }
   ],

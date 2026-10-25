@@ -92,3 +92,19 @@ def test_request_without_images_is_plain_string():
 
     req = AnalysisRequest.model_validate_json((ROOT / "examples" / "request_asml.json").read_text())
     assert isinstance(build_user_content(req, "2026-10-25"), str)
+
+
+def test_union_and_optional_budget():
+    """API limits: <= 16 union-typed (anyOf / nullable) fields and <= 24 optional ones per request,
+    and they compile exponentially. Keep a wide margin."""
+    schema = transform_schema(AnalysisResponse)
+    unions = 0
+    optionals = 0
+    for _, obj in _walk(schema):
+        props = obj.get("properties", {})
+        optionals += len(set(props) - set(obj.get("required", [])))
+        for v in props.values():
+            if "anyOf" in v or "oneOf" in v or isinstance(v.get("type"), list):
+                unions += 1
+    assert unions <= 6, f"{unions} union-typed fields; API limit 16, keep margin"
+    assert optionals == 0

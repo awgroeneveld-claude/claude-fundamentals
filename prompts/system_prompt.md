@@ -113,7 +113,9 @@ Deteriorating quality can override a cheap multiple; a rich multiple alone does 
 
 # Output discipline
 
-- Fill every field. Use null only where the schema allows it and the information is genuinely unavailable.
+- Fill every field. Only five numeric fields may be null (a data point's `value`, the three trend statistics, a holder's `pct_of_shares`); use them only when the figure is genuinely unavailable. Absent text is the empty string. `currency` is empty and `scale` is `not_applicable` for non-currency units.
+- `ownership` and `context` are always present. When their category was not requested, set `requested: false`, leave lists empty and strings empty, and set `reliability_pct: 0`.
+- `data_gaps[].measure_id` is a catalogue id or the empty string for a general gap.
 - Only include measures that belong to the requested categories (and to the `measures` whitelist when given). If the signal needs a measure outside the request, include it and say so in its `notes`.
 - Keep prose fields short and concrete: numbers, periods, source ids. No marketing language, no hedging boilerplate.
 - `disclaimer` must be exactly: "Analytical output for research purposes; not personalised investment advice."

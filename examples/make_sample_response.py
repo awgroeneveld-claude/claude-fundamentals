@@ -64,8 +64,8 @@ def trend(values, favourable_up=True, rel=TREND_DERIVED, comment=""):
                 reliability_pct=rel, comment=comment)
 
 
-def measure(mid, cat, label, unit, values, method, rel, trend_rel, favourable_up, basis, notes=None,
-            currency=None, scale=None, comment=""):
+def measure(mid, cat, label, unit, values, method, rel, trend_rel, favourable_up, basis, notes="",
+            currency="", scale="not_applicable", comment=""):
     series = [point(y, v, method, rel) for y, v in zip(years, values)]
     return {
         "measure_id": mid, "category": cat, "label": label, "unit": unit,
@@ -143,16 +143,17 @@ overall = int(round(statistics.fmean(p["reliability_pct"] for p in all_points)))
 resp = {
     "schema_version": "1.0",
     "symbol": req["symbol"],
-    "company_name": req.get("company_name"),
+    "company_name": req.get("company_name") or "",
     "analysis_date": "2026-10-25",
     "data_mode": "supplied",
     "sources": [{
         "id": S1, "type": "supplied_input", "title": "Caller-supplied statements: audited annual reports via internal data warehouse",
-        "url": None, "period_covered": "FY2021-FY2024, GBP millions", "retrieved_at": None,
+        "url": "", "period_covered": "FY2021-FY2024, GBP millions", "retrieved_at": "",
     }],
     "measures": measures,
-    "ownership": None,
-    "context": None,
+    "ownership": {"requested": False, "top_holders": [], "recent_insider_activity": "", "reliability_pct": 0, "notes": ""},
+    "context": {"requested": False, "industry": "", "peer_set_used": [], "segment_notes": "", "management_commentary": "",
+                "dividend_policy": "", "accounting_flags": "", "reliability_pct": 0},
     "pillars": pillars,
     "trend_summary": {
         "overall_direction": "deteriorating",
@@ -179,7 +180,7 @@ resp = {
     "sector_adjustments": ["Industrial machinery: D/E up to ~1.0 and net debt/EBITDA up to ~2.5x treated as moderate rather than high."],
     "data_gaps": [
         {"measure_id": "net_debt_to_ebitda", "description": "No depreciation/amortisation in supplied_data; cannot compute EBITDA."},
-        {"measure_id": None, "description": "Valuation category not requested; no price, market cap or share count supplied."},
+        {"measure_id": "", "description": "Valuation category not requested; no price, market cap or share count supplied."},
     ],
     "overall_reliability_pct": overall,
     "disclaimer": "Analytical output for research purposes; not personalised investment advice.",

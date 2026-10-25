@@ -157,6 +157,7 @@ class Scale(str, Enum):
     thousands = "thousands"
     millions = "millions"
     billions = "billions"
+    not_applicable = "not_applicable"  # unit is not a currency amount
 
 
 class Method(str, Enum):
@@ -308,6 +309,10 @@ class AnalysisRequest(Strict):
 
 # --------------------------------------------------------------------------- #
 # Response (schema enforced by the API via structured outputs)
+#
+# Grammar-size rule: the API allows at most 16 union-typed fields (anyOf / `X | None`) per
+# request and they compile exponentially. Only five numeric fields are nullable here; absent
+# text is the empty string, absent sub-objects carry `requested: false`. Keep it that way.
 # --------------------------------------------------------------------------- #
 
 
@@ -315,9 +320,9 @@ class Source(Strict):
     id: str = Field(description="Short handle referenced by data points, e.g. S1")
     type: SourceType
     title: str
-    url: str | None
-    period_covered: str | None = Field(description="e.g. 'FY2024 10-K', 'as of 2025-09-30'")
-    retrieved_at: str | None = Field(description="ISO date when the page was fetched, or null for supplied/recall")
+    url: str = Field(description="URL, or empty string for supplied input / recall")
+    period_covered: str = Field(description="e.g. 'FY2024 10-K', 'as of 2025-09-30'; empty if unknown")
+    retrieved_at: str = Field(description="ISO date the page was fetched; empty for supplied/recall")
 
 
 class DataPoint(Strict):
@@ -345,39 +350,41 @@ class Measure(Strict):
     category: Category
     label: str
     unit: Unit
-    currency: str | None = Field(description="ISO 4217 when unit is currency/per_share, else null")
-    scale: Scale | None = Field(description="Scale for currency amounts, null otherwise")
+    currency: str = Field(description="ISO 4217 when unit is currency/per_share, else empty string")
+    scale: Scale = Field(description="Scale for currency amounts; not_applicable otherwise")
     latest: DataPoint
     series: list[DataPoint] = Field(description="Chronological, oldest first, within the requested period")
     trend: Trend
     reliability_pct: int = Field(ge=0, le=100, description="Overall reliability of this measure")
     reliability_basis: str = Field(description="Why this reliability: source quality, period alignment, assumptions")
-    notes: str | None
+    notes: str = Field(description="Caveats, failed F-Score tests, discrepancies; empty if none")
 
 
 class Holder(Strict):
     name: str
     pct_of_shares: float | None
     holder_type: Literal["institution", "insider", "strategic", "fund", "other"]
-    as_of: str | None
+    as_of: str = Field(description="ISO date of the holding snapshot; empty if unknown")
     reliability_pct: int = Field(ge=0, le=100)
     source_ids: list[str]
 
 
 class Ownership(Strict):
+    requested: bool = Field(description="false when the ownership category was not requested; other fields then empty/0")
     top_holders: list[Holder]
-    recent_insider_activity: str | None = Field(description="Summary of buys/sells in the period, or null")
+    recent_insider_activity: str = Field(description="Summary of buys/sells in the period; empty if none/unknown")
     reliability_pct: int = Field(ge=0, le=100)
-    notes: str | None
+    notes: str
 
 
 class Context(Strict):
-    industry: str | None
+    requested: bool = Field(description="false when the context category was not requested; other fields then empty/0")
+    industry: str
     peer_set_used: list[str]
-    segment_notes: str | None
-    management_commentary: str | None
-    dividend_policy: str | None
-    accounting_flags: str | None = Field(description="Restatements, auditor notes, off-balance-sheet items")
+    segment_notes: str
+    management_commentary: str
+    dividend_policy: str
+    accounting_flags: str = Field(description="Restatements, auditor notes, off-balance-sheet items; empty if none")
     reliability_pct: int = Field(ge=0, le=100)
 
 
@@ -420,20 +427,20 @@ class SignalBlock(Strict):
 
 
 class DataGap(Strict):
-    measure_id: MeasureId | None
+    measure_id: str = Field(description="A measure id from the catalogue, or empty string for a general gap")
     description: str
 
 
 class AnalysisResponse(Strict):
     schema_version: Literal["1.0"]
     symbol: str = Field(description="Symbol as given in the request")
-    company_name: str | None
+    company_name: str = Field(description="Empty string if unknown")
     analysis_date: str = Field(description="ISO date the analysis was produced")
     data_mode: DataMode
     sources: list[Source]
     measures: list[Measure]
-    ownership: Ownership | None
-    context: Context | None
+    ownership: Ownership
+    context: Context
     pillars: list[Pillar]
     trend_summary: TrendSummary
     signal: SignalBlock

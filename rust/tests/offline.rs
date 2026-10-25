@@ -203,3 +203,46 @@ fn schema_enforcement_can_be_turned_off() {
         .unwrap()
         .contains("# Output schema"));
 }
+
+#[test]
+fn wire_schema_stays_within_union_budget() {
+    // API limits: <= 16 union-typed (anyOf / nullable) fields and <= 24 optional fields per request.
+    let schema: Value =
+        serde_json::from_str(fundamentals_client::client::RESPONSE_SCHEMA_JSON).unwrap();
+    fn walk(v: &Value, unions: &mut usize, optionals: &mut usize) {
+        if let Some(obj) = v.as_object() {
+            if let Some(props) = obj.get("properties").and_then(Value::as_object) {
+                let required: Vec<&str> = obj
+                    .get("required")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(Value::as_str).collect())
+                    .unwrap_or_default();
+                for (k, p) in props {
+                    if !required.contains(&k.as_str()) {
+                        *optionals += 1;
+                    }
+                    if p.get("anyOf").is_some()
+                        || p.get("oneOf").is_some()
+                        || p.get("type").is_some_and(Value::is_array)
+                    {
+                        *unions += 1;
+                    }
+                }
+            }
+            for child in obj.values() {
+                walk(child, unions, optionals);
+            }
+        } else if let Some(arr) = v.as_array() {
+            for child in arr {
+                walk(child, unions, optionals);
+            }
+        }
+    }
+    let (mut unions, mut optionals) = (0, 0);
+    walk(&schema, &mut unions, &mut optionals);
+    assert!(
+        unions <= 6,
+        "{unions} union-typed fields; API limit is 16, keep margin"
+    );
+    assert_eq!(optionals, 0);
+}
