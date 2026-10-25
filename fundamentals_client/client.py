@@ -331,6 +331,13 @@ class FundamentalsClient:
         raw_json = parsed.model_dump_json(indent=2)
 
         warnings = consistency_warnings(parsed)
+        if req.previous_response is None:
+            from .models import requested_measures
+
+            have = {m.measure_id.value for m in parsed.measures}
+            missing = [m for m in requested_measures(req) if m not in have]
+            if missing:
+                warnings.append(f"{len(missing)} requested catalogue measures missing: {missing}")
         if req.images and not any(src.type.value == "supplied_screenshot" for src in parsed.sources):
             warnings.append(f"{len(req.images)} screenshot(s) were attached but no supplied_screenshot source was registered")
         return AnalysisResult(

@@ -329,6 +329,95 @@ class AnalysisRequest(Strict):
     notes: str | None = Field(default=None, description="Free-text instructions within the framework's scope.")
 
 
+MEASURE_CATEGORY: dict[str, str] = {
+    "share_price": "valuation",
+    "market_cap": "valuation",
+    "enterprise_value": "valuation",
+    "pe_trailing": "valuation",
+    "pe_forward": "valuation",
+    "pb": "valuation",
+    "ps": "valuation",
+    "ev_ebitda": "valuation",
+    "ev_sales": "valuation",
+    "fcf_yield": "valuation",
+    "earnings_yield": "valuation",
+    "peg": "valuation",
+    "dividend_yield": "valuation",
+    "payout_ratio": "valuation",
+    "pe_historical_percentile": "valuation",
+    "ev_ebitda_historical_percentile": "valuation",
+    "revenue": "profitability",
+    "gross_profit": "profitability",
+    "gross_margin": "profitability",
+    "operating_income": "profitability",
+    "operating_margin": "profitability",
+    "ebitda": "profitability",
+    "ebitda_margin": "profitability",
+    "net_income": "profitability",
+    "net_margin": "profitability",
+    "eps_diluted": "profitability",
+    "roe": "profitability",
+    "roa": "profitability",
+    "roic": "profitability",
+    "margin_stability_cv": "profitability",
+    "earnings_variability_cv": "profitability",
+    "interest_income": "non_operating",
+    "interest_expense": "non_operating",
+    "investment_gains_losses": "non_operating",
+    "fx_and_derivative_result": "non_operating",
+    "other_income_expense": "non_operating",
+    "net_non_operating_result": "non_operating",
+    "non_operating_pct_revenue": "non_operating",
+    "non_operating_pct_operating_income": "non_operating",
+    "one_time_items": "non_operating",
+    "long_term_debt": "leverage",
+    "short_term_debt": "leverage",
+    "total_debt": "leverage",
+    "cash_and_equivalents": "leverage",
+    "net_debt": "leverage",
+    "shareholders_equity": "leverage",
+    "total_assets": "leverage",
+    "debt_to_equity": "leverage",
+    "debt_to_assets": "leverage",
+    "lt_debt_to_assets": "leverage",
+    "net_debt_to_ebitda": "leverage",
+    "interest_coverage": "leverage",
+    "current_ratio": "leverage",
+    "operating_cash_flow": "cash_flow_quality",
+    "capex": "cash_flow_quality",
+    "free_cash_flow": "cash_flow_quality",
+    "fcf_margin": "cash_flow_quality",
+    "accruals": "cash_flow_quality",
+    "cash_conversion": "cash_flow_quality",
+    "accrual_ratio": "cash_flow_quality",
+    "sloan_accrual_ratio": "cash_flow_quality",
+    "piotroski_f_score": "cash_flow_quality",
+    "working_capital_change": "cash_flow_quality",
+    "net_share_issuance": "cash_flow_quality",
+    "capital_returned_pct_fcf": "cash_flow_quality",
+    "revenue_growth_yoy": "growth",
+    "revenue_cagr": "growth",
+    "operating_income_cagr": "growth",
+    "net_income_cagr": "growth",
+    "fcf_cagr": "growth",
+    "eps_growth_yoy": "growth",
+    "asset_turnover": "growth",
+    "institutional_ownership_pct": "ownership",
+    "insider_ownership_pct": "ownership",
+    "insider_net_buying": "ownership",
+    "shares_outstanding": "ownership",
+    "shares_outstanding_change_pct": "ownership",
+}
+
+
+def requested_measures(req: "AnalysisRequest") -> list[str]:
+    """Catalogue measure ids the request asks for: the whitelist if given, else every id in the requested categories."""
+    if req.measures:
+        return [m.value for m in req.measures]
+    cats = {c.value for c in req.categories}
+    return [m for m, c in MEASURE_CATEGORY.items() if c in cats]
+
+
 # --------------------------------------------------------------------------- #
 # Response (schema enforced by the API via structured outputs)
 #

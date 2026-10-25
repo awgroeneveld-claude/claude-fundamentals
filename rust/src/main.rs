@@ -244,6 +244,18 @@ async fn main() -> anyhow::Result<()> {
                     Some(req.recent_quarters),
                 );
                 result.warnings = consistency_warnings(&merged);
+                let have: Vec<_> = merged.measures.iter().map(|m| m.measure_id).collect();
+                let missing: Vec<String> = fundamentals_client::models::requested_measures(&req)
+                    .into_iter()
+                    .filter(|m| !have.contains(m))
+                    .map(|m| format!("{m:?}"))
+                    .collect();
+                if !missing.is_empty() {
+                    result.warnings.push(format!(
+                        "{} requested catalogue measures missing after merge: {missing:?}",
+                        missing.len()
+                    ));
+                }
                 result.raw_json = serde_json::to_string_pretty(&merged)?;
                 result.response = merged;
             }

@@ -204,3 +204,12 @@ def test_quarterly_points_do_not_bound_trend_reliability():
     series.sort(key=lambda p: p["period_end"])
     w = consistency_warnings(AnalysisResponse.model_validate(data))
     assert not any("trend reliability" in x for x in w), w
+
+
+def test_catalogue_mapping_matches_enum():
+    from fundamentals_client.models import MEASURE_CATEGORY, MeasureId, requested_measures
+
+    assert set(MEASURE_CATEGORY) == {m.value for m in MeasureId}
+    req = AnalysisRequest.model_validate_json((ROOT / "examples" / "request_supplied_data.json").read_text())
+    ids = requested_measures(req)
+    assert ids and all(MEASURE_CATEGORY[i] in {c.value for c in req.categories} for i in ids)

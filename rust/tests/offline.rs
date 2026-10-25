@@ -653,3 +653,17 @@ fn every_schema_enum_value_deserializes_in_rust() {
     }
     assert!(checked > 40, "only {checked} enum values checked");
 }
+
+#[test]
+fn catalogue_mapping_is_complete_and_matches_categories() {
+    use fundamentals_client::models::{requested_measures, MeasureId};
+    let all = MeasureId::all();
+    assert_eq!(all.len(), 77);
+    let req = AnalysisRequest::new("X", "2020-01-01", "2024-12-31");
+    assert_eq!(requested_measures(&req).len(), 77);
+    let text = std::fs::read_to_string(root().join("examples/request_supplied_data.json")).unwrap();
+    let r: AnalysisRequest = serde_json::from_str(&text).unwrap();
+    let req_ms = requested_measures(&r);
+    assert!(req_ms.iter().all(|m| r.categories.contains(&m.category())));
+    assert!(req_ms.len() > 20 && req_ms.len() < 77);
+}

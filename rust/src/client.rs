@@ -462,6 +462,19 @@ impl FundamentalsClient {
         }
         let raw_json = serde_json::to_string_pretty(&response)?;
         let mut warnings = consistency_warnings(&response);
+        let returned: Vec<crate::models::MeasureId> =
+            response.measures.iter().map(|m| m.measure_id).collect();
+        let missing: Vec<String> = crate::models::requested_measures(req)
+            .into_iter()
+            .filter(|m| !returned.contains(m))
+            .map(|m| format!("{m:?}"))
+            .collect();
+        if !missing.is_empty() && req.previous_response.is_none() {
+            warnings.push(format!(
+                "{} requested catalogue measures missing: {missing:?}",
+                missing.len()
+            ));
+        }
         if !req.images.is_empty()
             && !response
                 .sources

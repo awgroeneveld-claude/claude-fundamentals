@@ -598,6 +598,173 @@ pub struct AnalysisResponse {
     pub disclaimer: String,
 }
 
+impl MeasureId {
+    /// The catalogue category each measure belongs to (mirrors the catalogue in the system prompt).
+    pub fn category(self) -> Category {
+        use MeasureId::*;
+        match self {
+            SharePrice
+            | MarketCap
+            | EnterpriseValue
+            | PeTrailing
+            | PeForward
+            | Pb
+            | Ps
+            | EvEbitda
+            | EvSales
+            | FcfYield
+            | EarningsYield
+            | Peg
+            | DividendYield
+            | PayoutRatio
+            | PeHistoricalPercentile
+            | EvEbitdaHistoricalPercentile => Category::Valuation,
+            Revenue
+            | GrossProfit
+            | GrossMargin
+            | OperatingIncome
+            | OperatingMargin
+            | Ebitda
+            | EbitdaMargin
+            | NetIncome
+            | NetMargin
+            | EpsDiluted
+            | Roe
+            | Roa
+            | Roic
+            | MarginStabilityCv
+            | EarningsVariabilityCv => Category::Profitability,
+            InterestIncome
+            | InterestExpense
+            | InvestmentGainsLosses
+            | FxAndDerivativeResult
+            | OtherIncomeExpense
+            | NetNonOperatingResult
+            | NonOperatingPctRevenue
+            | NonOperatingPctOperatingIncome
+            | OneTimeItems => Category::NonOperating,
+            LongTermDebt | ShortTermDebt | TotalDebt | CashAndEquivalents | NetDebt
+            | ShareholdersEquity | TotalAssets | DebtToEquity | DebtToAssets | LtDebtToAssets
+            | NetDebtToEbitda | InterestCoverage | CurrentRatio => Category::Leverage,
+            OperatingCashFlow
+            | Capex
+            | FreeCashFlow
+            | FcfMargin
+            | Accruals
+            | CashConversion
+            | AccrualRatio
+            | SloanAccrualRatio
+            | PiotroskiFScore
+            | WorkingCapitalChange
+            | NetShareIssuance
+            | CapitalReturnedPctFcf => Category::CashFlowQuality,
+            RevenueGrowthYoy | RevenueCagr | OperatingIncomeCagr | NetIncomeCagr | FcfCagr
+            | EpsGrowthYoy | AssetTurnover => Category::Growth,
+            InstitutionalOwnershipPct
+            | InsiderOwnershipPct
+            | InsiderNetBuying
+            | SharesOutstanding
+            | SharesOutstandingChangePct => Category::Ownership,
+        }
+    }
+
+    /// Every catalogue measure, in catalogue order.
+    pub fn all() -> Vec<MeasureId> {
+        use MeasureId::*;
+        vec![
+            SharePrice,
+            MarketCap,
+            EnterpriseValue,
+            PeTrailing,
+            PeForward,
+            Pb,
+            Ps,
+            EvEbitda,
+            EvSales,
+            FcfYield,
+            EarningsYield,
+            Peg,
+            DividendYield,
+            PayoutRatio,
+            PeHistoricalPercentile,
+            EvEbitdaHistoricalPercentile,
+            Revenue,
+            GrossProfit,
+            GrossMargin,
+            OperatingIncome,
+            OperatingMargin,
+            Ebitda,
+            EbitdaMargin,
+            NetIncome,
+            NetMargin,
+            EpsDiluted,
+            Roe,
+            Roa,
+            Roic,
+            MarginStabilityCv,
+            EarningsVariabilityCv,
+            InterestIncome,
+            InterestExpense,
+            InvestmentGainsLosses,
+            FxAndDerivativeResult,
+            OtherIncomeExpense,
+            NetNonOperatingResult,
+            NonOperatingPctRevenue,
+            NonOperatingPctOperatingIncome,
+            OneTimeItems,
+            LongTermDebt,
+            ShortTermDebt,
+            TotalDebt,
+            CashAndEquivalents,
+            NetDebt,
+            ShareholdersEquity,
+            TotalAssets,
+            DebtToEquity,
+            DebtToAssets,
+            LtDebtToAssets,
+            NetDebtToEbitda,
+            InterestCoverage,
+            CurrentRatio,
+            OperatingCashFlow,
+            Capex,
+            FreeCashFlow,
+            FcfMargin,
+            Accruals,
+            CashConversion,
+            AccrualRatio,
+            SloanAccrualRatio,
+            PiotroskiFScore,
+            WorkingCapitalChange,
+            NetShareIssuance,
+            CapitalReturnedPctFcf,
+            RevenueGrowthYoy,
+            RevenueCagr,
+            OperatingIncomeCagr,
+            NetIncomeCagr,
+            FcfCagr,
+            EpsGrowthYoy,
+            AssetTurnover,
+            InstitutionalOwnershipPct,
+            InsiderOwnershipPct,
+            InsiderNetBuying,
+            SharesOutstanding,
+            SharesOutstandingChangePct,
+        ]
+    }
+}
+
+/// Catalogue measures the request asks for: the `measures` whitelist if given, otherwise every
+/// catalogue measure in the requested categories.
+pub fn requested_measures(req: &AnalysisRequest) -> Vec<MeasureId> {
+    match &req.measures {
+        Some(list) => list.clone(),
+        None => MeasureId::all()
+            .into_iter()
+            .filter(|m| req.categories.contains(&m.category()))
+            .collect(),
+    }
+}
+
 /// Validate the numeric ranges the JSON Schema cannot express (the API strips `minimum`/`maximum`).
 pub fn validate_ranges(r: &AnalysisResponse) -> Vec<String> {
     let mut errs = Vec::new();
